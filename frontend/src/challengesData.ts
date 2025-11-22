@@ -89,5 +89,38 @@ export const challengesData: Challenge[] = [
         }
       }
     ]
+  },
+  {
+    id: 'scratch-control-loop',
+    title: 'くり返しでゴールを見つけよう',
+    description:
+      'for 文のブロックを使って、ゴール地点(40歩)まで進み、条件付きで報告してみよう。',
+    difficulty: '初級',
+    image: 'images/character.png?auto=format&fit=crop&w=800&q=80',
+    languages: ['Scratch'],
+    instructions: `緑の旗を押したら、コントロールカテゴリのブロックでゴールまで進もう。
+
+【ポイント】
+・「for (回数を選んでくり返す)」の下に「10歩うごかす」をインデントして入れよう（回数欄で 4 を選ぼう。終わりは自動で閉じるよ）
+・「もし [条件] なら」のドロップダウンから「ゴールした？」を選んでみよう
+・条件が真になったら「着いたよ！」と言わせたり、空にして自動メッセージでも OK`,
+    examples: `例のブロック並び:
+1. ⚑ が押されたとき
+2. for (回数を選んでくり返す)  ※回数は 4
+   - 10歩うごかす
+3. もし [条件] なら（条件: ゴールした？）
+   - 「ゴールできたよ！」と言う`,
+    video: '',
+    testCases: [
+      {
+        input: [{}],
+        expected: {
+          x: 40,
+          moveTotal: 40,
+          messageIncludes: 'ゴールできたよ！',
+          lastMessage: 'ゴールできたよ！'
+        }
+      }
+    ]
   }
 ];

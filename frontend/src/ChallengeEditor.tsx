@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -8,12 +8,8 @@ import {
 } from 'lucide-react';
 import { Challenge } from './types/challenge';
 import { challengeService } from './services/challengeService';
+import stageCharacterImg from '../images/character.png';
 import './styles/scratchWorkspace.css';
-
-type WorkspaceBlock = {
-  id: string;
-  type: ScratchBlockId;
-};
 
 type ScratchBlockId =
   | 'event_flag'
@@ -23,13 +19,25 @@ type ScratchBlockId =
   | 'motion_change_y'
   | 'looks_hello'
   | 'looks_goal'
-  | 'looks_jump';
+  | 'looks_jump'
+  | 'control_for_loop'
+  | 'control_if_goal'
+  | 'condition_goal_reached';
+
+type WorkspaceBlockType = ScratchBlockId | 'control_end';
+
+type WorkspaceBlock = {
+  id: string;
+  type: WorkspaceBlockType;
+  conditionId?: ScratchBlockId;
+  loopCount?: number;
+};
 
 type ScratchPaletteItem = {
   id: ScratchBlockId;
   label: string;
   color: string;
-  group: 'イベント' | 'モーション' | '見た目';
+  group: 'イベント' | 'モーション' | '見た目' | 'コントロール' | '条件';
 };
 
 type DragSource =
@@ -53,6 +61,20 @@ type DragPreviewState = {
   source: 'palette' | 'workspace';
 };
 
+const CONTROL_GOAL_TARGET_X = 40;
+const CONTROL_GOAL_MESSAGE = 'ゴールできたよ！';
+const DEFAULT_CONTROL_FOR_LOOP_COUNT = 4;
+const CONTROL_FOR_LOOP_PALETTE_LABEL = 'for (回数を選んでくり返す)';
+const MIN_CONTROL_FOR_LOOP_COUNT = 1;
+const MAX_CONTROL_FOR_LOOP_COUNT = 10;
+const INDENT_UNIT_REM = 2;
+
+const formatLoopLabel = (count: number) => `for (${count}回くり返す)`;
+const normalizeLoopCount = (value?: number) => {
+  const parsed = typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : DEFAULT_CONTROL_FOR_LOOP_COUNT;
+  return Math.min(MAX_CONTROL_FOR_LOOP_COUNT, Math.max(MIN_CONTROL_FOR_LOOP_COUNT, parsed));
+};
+
 const paletteItems: ScratchPaletteItem[] = [
   { id: 'event_flag', label: '⚑ が押されたとき', color: '#FFBF00', group: 'イベント' },
   { id: 'motion_move', label: '10歩うごかす', color: '#4C97FF', group: 'モーション' },
@@ -62,9 +84,46 @@ const paletteItems: ScratchPaletteItem[] = [
   { id: 'looks_hello', label: '「こんにちは！」と言う', color: '#9966FF', group: '見た目' },
   { id: 'looks_goal', label: '「着いたよ！」と言う', color: '#9966FF', group: '見た目' },
   { id: 'looks_jump', label: '「ジャンプ成功！」と言う', color: '#9966FF', group: '見た目' },
+  { id: 'control_for_loop', label: CONTROL_FOR_LOOP_PALETTE_LABEL, color: '#FFAB19', group: 'コントロール' },
+  { id: 'control_if_goal', label: 'もし [条件] なら', color: '#FFAB19', group: 'コントロール' },
+  { id: 'condition_goal_reached', label: 'ゴールした？', color: '#FACC15', group: '条件' },
 ];
 
-const groupOrder: Array<ScratchPaletteItem['group']> = ['イベント', 'モーション', '見た目'];
+const conditionPaletteItems = paletteItems.filter((item) => item.group === '条件');
+const conditionBlockIdSet = new Set<ScratchBlockId>(conditionPaletteItems.map((item) => item.id));
+
+const groupOrder: Array<ScratchPaletteItem['group']> = ['イベント', 'モーション', '見た目', 'コントロール', '条件'];
+
+type ProgramNode = {
+  type: ScratchBlockId;
+  children: ProgramNode[];
+  conditionId?: ScratchBlockId;
+  loopCount?: number;
+};
+
+const isControlStartBlock = (type: WorkspaceBlockType): type is 'control_for_loop' | 'control_if_goal' =>
+  type === 'control_for_loop' || type === 'control_if_goal';
+const isControlEndBlock = (type: WorkspaceBlockType): type is 'control_end' => type === 'control_end';
+const findMatchingControlEndIndex = (blocks: WorkspaceBlock[], startIndex: number) => {
+  let depth = 0;
+  for (let i = startIndex + 1; i < blocks.length; i += 1) {
+    const currentType = blocks[i]?.type;
+    if (!currentType) {
+      continue;
+    }
+    if (isControlStartBlock(currentType)) {
+      depth += 1;
+      continue;
+    }
+    if (isControlEndBlock(currentType)) {
+      if (depth === 0) {
+        return i;
+      }
+      depth -= 1;
+    }
+  }
+  return -1;
+};
 
 const resolvePaletteInfo = (blockType: ScratchBlockId) => {
   const item = paletteItems.find((entry) => entry.id === blockType);
@@ -73,6 +132,85 @@ const resolvePaletteInfo = (blockType: ScratchBlockId) => {
     color: item?.color ?? '#94a3b8',
     group: item?.group ?? 'ブロック',
   };
+};
+
+const computeIndentationGuides = (blocks: WorkspaceBlock[]) => {
+  const blockIndentMap = new Map<string, number>();
+  const slotIndentLevels: number[] = new Array(blocks.length + 1).fill(0);
+  let depth = 0;
+  slotIndentLevels[0] = depth;
+
+  for (let i = 0; i < blocks.length; i += 1) {
+    const block = blocks[i];
+    if (isControlEndBlock(block.type)) {
+      depth = Math.max(0, depth - 1);
+      blockIndentMap.set(block.id, depth);
+      slotIndentLevels[i + 1] = depth;
+      continue;
+    }
+    blockIndentMap.set(block.id, depth);
+    if (isControlStartBlock(block.type)) {
+      depth += 1;
+    }
+    slotIndentLevels[i + 1] = depth;
+  }
+
+  return { blockIndentMap, slotIndentLevels };
+};
+
+type ParseResult = {
+  nodes: ProgramNode[];
+  nextIndex: number;
+  ended: boolean;
+  error?: string;
+};
+
+const buildProgramTree = (blocks: WorkspaceBlock[]): { nodes?: ProgramNode[]; error?: string } => {
+  const parseFromIndex = (startIndex: number): ParseResult => {
+    const nodes: ProgramNode[] = [];
+    let index = startIndex;
+
+    while (index < blocks.length) {
+      const current = blocks[index];
+
+      if (isControlEndBlock(current.type)) {
+        return { nodes, nextIndex: index + 1, ended: true };
+      }
+
+      if (isControlStartBlock(current.type)) {
+        const childResult = parseFromIndex(index + 1);
+        if (childResult.error) {
+          return childResult;
+        }
+        if (!childResult.ended) {
+          const info = resolvePaletteInfo(current.type);
+          return {
+            nodes: [],
+            nextIndex: childResult.nextIndex,
+            ended: false,
+            error: `${info.label} の終わりはインデントで表そう！ブロックの並びをもう一度チェックしてみてね。`,
+          };
+        }
+        nodes.push({ type: current.type, children: childResult.nodes, conditionId: current.conditionId, loopCount: current.loopCount });
+        index = childResult.nextIndex;
+        continue;
+      }
+
+      nodes.push({ type: current.type, children: [] });
+      index += 1;
+    }
+
+    return { nodes, nextIndex: index, ended: false };
+  };
+
+  const result = parseFromIndex(0);
+  if (result.error) {
+    return { error: result.error };
+  }
+  if (result.ended) {
+    return { error: 'インデントの戻し方がおかしいみたい。ブロックの順番を確認してね。' };
+  }
+  return { nodes: result.nodes };
 };
 
 const newBlockId = (() => {
@@ -136,51 +274,114 @@ const runWorkspaceProgram = (
     return { error: 'まずはブロックを配置してみよう！' };
   }
 
-  if (blocks[0].type !== 'event_flag') {
+  const tree = buildProgramTree(blocks);
+  if (tree.error || !tree.nodes) {
+    return { error: tree.error ?? 'ブロック構造の解析中にエラーが発生しました。' };
+  }
+
+  if (tree.nodes.length === 0 || tree.nodes[0].type !== 'event_flag') {
     return { error: '一番上には「⚑ が押されたとき」を置いてみよう！' };
   }
 
   const state = createInitialState(overrides);
   let eventSeen = false;
 
-  for (let i = 0; i < blocks.length; i += 1) {
-    const block = blocks[i];
+  const evaluateCondition = (conditionId?: ScratchBlockId): { error?: string; value?: boolean } => {
+    if (!conditionId) {
+      return { error: 'もしブロックの条件を選んでみよう！' };
+    }
+    switch (conditionId) {
+      case 'condition_goal_reached':
+        return { value: state.x >= CONTROL_GOAL_TARGET_X };
+      default:
+        return { error: 'まだ対応していない条件が含まれています。' };
+    }
+  };
 
-    switch (block.type) {
+  const executeNode = (node: ProgramNode): { error?: string } => {
+    switch (node.type) {
       case 'event_flag':
-        if (eventSeen && i > 0) {
+        if (eventSeen) {
           return { error: 'イベントブロックは一番上の1つだけにしよう！' };
         }
         eventSeen = true;
-        break;
+        return {};
       case 'motion_move':
         state.x += 10;
         state.moveTotal += 10;
-        break;
+        return {};
       case 'motion_move_small':
         state.x += 3;
         state.moveTotal += 3;
-        break;
+        return {};
       case 'motion_change_y':
         state.y += 50;
         updateVerticalExtremes(state);
-        break;
+        return {};
       case 'motion_set_y_zero':
         state.y = 0;
         updateVerticalExtremes(state);
-        break;
+        return {};
       case 'looks_hello':
         state.messages.push('こんにちは！');
-        break;
+        return {};
       case 'looks_goal':
         state.messages.push('着いたよ！');
-        break;
+        return {};
       case 'looks_jump':
         state.messages.push('ジャンプ成功！');
-        break;
+        return {};
+      case 'control_for_loop': {
+        if (node.children.length === 0) {
+          return { error: 'for ブロックの中に動作させたいブロックを入れてみよう！' };
+        }
+        const loopCount = normalizeLoopCount(node.loopCount);
+        for (let iteration = 0; iteration < loopCount; iteration += 1) {
+          const bodyOutcome = executeNodes(node.children);
+          if (bodyOutcome.error) {
+            return bodyOutcome;
+          }
+        }
+        return {};
+      }
+      case 'control_if_goal': {
+        const conditionResult = evaluateCondition(node.conditionId);
+        if (conditionResult.error) {
+          return { error: conditionResult.error };
+        }
+        if (conditionResult.value) {
+          if (node.children.length === 0) {
+            state.messages.push(CONTROL_GOAL_MESSAGE);
+            return {};
+          }
+          return executeNodes(node.children);
+        }
+        return {};
+      }
+      case 'control_end':
+        return {};
       default:
         return { error: 'まだ対応していないブロックが含まれています。' };
     }
+  };
+
+  const executeNodes = (nodeList: ProgramNode[]): { error?: string } => {
+    for (const node of nodeList) {
+      const outcome = executeNode(node);
+      if (outcome.error) {
+        return outcome;
+      }
+    }
+    return {};
+  };
+
+  const result = executeNodes(tree.nodes);
+  if (result.error) {
+    return { error: result.error };
+  }
+
+  if (!eventSeen) {
+    return { error: '一番上には「⚑ が押されたとき」を置いてみよう！' };
   }
 
   return { state };
@@ -283,11 +484,19 @@ const ChallengeEditor = () => {
   }, []);
 
   const groupedPalette = useMemo(() => {
-    return groupOrder.map((group) => ({
-      group,
-      items: paletteItems.filter((item) => item.group === group),
-    }));
+    return groupOrder
+      .map((group) => ({
+        group,
+        items: paletteItems.filter(
+          (item) =>
+            item.group === group &&
+            group !== '条件'
+        ),
+      }))
+      .filter((section) => section.items.length > 0);
   }, []);
+
+  const { blockIndentMap, slotIndentLevels } = useMemo(() => computeIndentationGuides(workspace), [workspace]);
 
   const resetDragState = useCallback(() => {
     dragSourceRef.current = null;
@@ -340,13 +549,17 @@ const ChallengeEditor = () => {
       }
       event.preventDefault();
       const block = workspace[index];
-      if (!block) {
+      if (!block || isControlEndBlock(block.type)) {
         return;
       }
       const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
       const offsetX = event.clientX - rect.left;
       const offsetY = event.clientY - rect.top;
       const paletteInfo = resolvePaletteInfo(block.type);
+      const previewLabel =
+        block.type === 'control_for_loop'
+          ? formatLoopLabel(normalizeLoopCount(block.loopCount))
+          : paletteInfo.label;
       dragSourceRef.current = {
         type: 'workspace',
         blockId: block.id,
@@ -358,7 +571,7 @@ const ChallengeEditor = () => {
       setHoverIndex(index);
       setIsDraggingBlock(true);
       setDragPreview({
-        label: paletteInfo.label,
+        label: previewLabel,
         group: paletteInfo.group,
         color: paletteInfo.color,
         x: event.clientX,
@@ -466,7 +679,16 @@ const ChallengeEditor = () => {
           setWorkspace((prev) => {
             const next = [...prev];
             const insertIndex = Math.max(0, Math.min(targetIndex, next.length));
-            next.splice(insertIndex, 0, { id: newBlockId(), type: source.item.id });
+            const newBlock: WorkspaceBlock = {
+              id: newBlockId(),
+              type: source.item.id,
+              loopCount: source.item.id === 'control_for_loop' ? DEFAULT_CONTROL_FOR_LOOP_COUNT : undefined,
+            };
+            const blocksToInsert: WorkspaceBlock[] = [newBlock];
+            if (isControlStartBlock(source.item.id)) {
+              blocksToInsert.push({ id: newBlockId(), type: 'control_end' });
+            }
+            next.splice(insertIndex, 0, ...blocksToInsert);
             return next;
           });
         } else {
@@ -479,16 +701,33 @@ const ChallengeEditor = () => {
             if (fromIndex === -1) {
               return next;
             }
-            const [moved] = next.splice(fromIndex, 1);
-            if (!moved) {
+            const movingBlock = next[fromIndex];
+            if (!movingBlock || isControlEndBlock(movingBlock.type)) {
               return next;
             }
-            let insertIndex = Math.max(0, Math.min(targetIndex, next.length));
-            if (fromIndex < insertIndex) {
-              insertIndex -= 1;
+            let sliceLength = 1;
+            if (isControlStartBlock(movingBlock.type)) {
+              const matchingEnd = findMatchingControlEndIndex(next, fromIndex);
+              if (matchingEnd === -1) {
+                return next;
+              }
+              sliceLength = matchingEnd - fromIndex + 1;
+              if (targetIndex > fromIndex && targetIndex < matchingEnd + 1) {
+                return next;
+              }
+            } else if (targetIndex === fromIndex || targetIndex === fromIndex + 1) {
+              return next;
+            }
+            const extracted = next.splice(fromIndex, sliceLength);
+            if (!extracted.length) {
+              return next;
+            }
+            let insertIndex = targetIndex;
+            if (fromIndex < targetIndex) {
+              insertIndex -= extracted.length;
             }
             insertIndex = Math.max(0, Math.min(insertIndex, next.length));
-            next.splice(insertIndex, 0, moved);
+            next.splice(insertIndex, 0, ...extracted);
             return next;
           });
         }
@@ -497,7 +736,20 @@ const ChallengeEditor = () => {
           const next = [...prev];
           const removeIndex = next.findIndex((block) => block.id === source.blockId);
           if (removeIndex >= 0) {
-            next.splice(removeIndex, 1);
+            const block = next[removeIndex];
+            if (!block) {
+              return next;
+            }
+            if (isControlStartBlock(block.type)) {
+              const endIndex = findMatchingControlEndIndex(next, removeIndex);
+              if (endIndex === -1) {
+                next.splice(removeIndex, 1);
+              } else {
+                next.splice(removeIndex, endIndex - removeIndex + 1);
+              }
+            } else if (!isControlEndBlock(block.type)) {
+              next.splice(removeIndex, 1);
+            }
           }
           return next;
         });
@@ -580,13 +832,86 @@ const ChallengeEditor = () => {
   const handleRemove = (event: MouseEvent<HTMLButtonElement>, blockId: string) => {
     event.stopPropagation();
     event.preventDefault();
-    setWorkspace((prev) => prev.filter((block) => block.id !== blockId));
+    setWorkspace((prev) => {
+      const next = [...prev];
+      const targetIndex = next.findIndex((block) => block.id === blockId);
+      if (targetIndex === -1) {
+        return prev;
+      }
+      const block = next[targetIndex];
+      if (!block) {
+        return prev;
+      }
+      if (isControlStartBlock(block.type)) {
+        const endIndex = findMatchingControlEndIndex(next, targetIndex);
+        if (endIndex === -1) {
+          next.splice(targetIndex, 1);
+          return next;
+        }
+        next.splice(targetIndex, endIndex - targetIndex + 1);
+        return next;
+      }
+      if (isControlEndBlock(block.type)) {
+        return next;
+      }
+      next.splice(targetIndex, 1);
+      return next;
+    });
   };
 
-  const blockLabel = (blockId: ScratchBlockId) => {
-    const item = paletteItems.find((i) => i.id === blockId);
-    return item?.label ?? blockId;
+  const blockLabel = (block: WorkspaceBlock) => {
+    if (block.type === 'control_for_loop') {
+      const count = normalizeLoopCount(block.loopCount);
+      return formatLoopLabel(count);
+    }
+    const item = paletteItems.find((i) => i.id === block.type);
+    return item?.label ?? block.type;
   };
+
+  const handleLoopCountChange = useCallback((loopBlockId: string, rawValue: string) => {
+    if (rawValue.trim() === '') {
+      return;
+    }
+    const normalized = normalizeLoopCount(Number(rawValue));
+    setWorkspace((prev) => {
+      const next = [...prev];
+      const loopIndex = next.findIndex((block) => block.id === loopBlockId);
+      if (loopIndex === -1) {
+        return prev;
+      }
+      const loopBlock = next[loopIndex];
+      if (!loopBlock || loopBlock.type !== 'control_for_loop') {
+        return prev;
+      }
+      if (loopBlock.loopCount === normalized) {
+        return prev;
+      }
+      next[loopIndex] = { ...loopBlock, loopCount: normalized };
+      return next;
+    });
+  }, []);
+
+  const handleConditionSelect = useCallback((controlBlockId: string, conditionId: ScratchBlockId) => {
+    if (!conditionBlockIdSet.has(conditionId)) {
+      return;
+    }
+    setWorkspace((prev) => {
+      const next = [...prev];
+      const controlIndex = next.findIndex((block) => block.id === controlBlockId);
+      if (controlIndex === -1) {
+        return prev;
+      }
+      const controlBlock = next[controlIndex];
+      if (!controlBlock || controlBlock.type !== 'control_if_goal') {
+        return prev;
+      }
+      if (controlBlock.conditionId === conditionId) {
+        return prev;
+      }
+      next[controlIndex] = { ...controlBlock, conditionId };
+      return next;
+    });
+  }, []);
 
   const handleRun = useCallback(() => {
     if (!challenge) return;
@@ -647,6 +972,12 @@ const ChallengeEditor = () => {
     .filter(Boolean)
     .join(' ');
   const showDropGuides = isDraggingBlock;
+  const indentStyleForLevel = useCallback(
+    (level: number): CSSProperties => ({
+      marginLeft: `${level * INDENT_UNIT_REM}rem`,
+    }),
+    []
+  );
 
   const renderDropGuide = (index: number) => {
     if (!showDropGuides) {
@@ -657,10 +988,12 @@ const ChallengeEditor = () => {
       return null;
     }
     const isActive = hoverIndex === index;
+    const indentLevel = slotIndentLevels[index] ?? 0;
     return (
       <div
         key={`placeholder-${index}`}
         className={`workspace-drop-placeholder ${isActive ? 'workspace-drop-placeholder--active' : 'workspace-drop-placeholder--inactive'}`}
+        style={indentStyleForLevel(indentLevel)}
       >
         <span>ここにブロックを置く</span>
       </div>
@@ -796,35 +1129,124 @@ const ChallengeEditor = () => {
                       <>
                         {renderDropGuide(0)}
                         {workspace.map((block, index) => {
+                          if (isControlEndBlock(block.type)) {
+                            const indentLevel = blockIndentMap.get(block.id) ?? 0;
+                            const slotStyle = indentStyleForLevel(indentLevel);
+                            return (
+                              <Fragment key={block.id}>
+                                <div
+                                  ref={(element) => {
+                                    if (element) {
+                                      workspaceSlotRefs.current.set(block.id, element);
+                                    } else {
+                                      workspaceSlotRefs.current.delete(block.id);
+                                    }
+                                  }}
+                                  className="workspace-slot workspace-slot--virtual-end"
+                                  style={slotStyle}
+                                  aria-hidden
+                                >
+                                  <div className="workspace-slot__rail">
+                                    <span className="workspace-slot__dot" aria-hidden />
+                                  </div>
+                                </div>
+                                {renderDropGuide(index + 1)}
+                              </Fragment>
+                            );
+                          }
                           const paletteBlock = paletteItems.find((item) => item.id === block.type);
                           const background = paletteBlock?.color ?? '#94a3b8';
                           const isDragging = dragIndex === index;
                           const isSlotActive = hoverIndex === index && dragIndex === index;
-                          const label = blockLabel(block.type);
+                          const label = blockLabel(block);
+                          const indentLevel = blockIndentMap.get(block.id) ?? 0;
+                          const isControlStart = isControlStartBlock(block.type);
+                          const isIfBlock = block.type === 'control_if_goal';
+                          const isForBlock = block.type === 'control_for_loop';
+                          const loopCount = isForBlock ? normalizeLoopCount(block.loopCount) : undefined;
+                          const slotStyle = indentStyleForLevel(indentLevel);
+                          const blockClassName = [
+                            'workspace-block',
+                            isDragging ? 'workspace-block--dragging' : '',
+                            isControlStart ? 'workspace-block--control-start' : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ');
+                          const blockStyle: CSSProperties = {
+                            backgroundColor: background,
+                          };
+                          const selectedConditionId = isIfBlock ? block.conditionId ?? '' : '';
 
                           return (
                             <Fragment key={block.id}>
-                            <div
-                              ref={(element) => {
-                                if (element) {
-                                  workspaceSlotRefs.current.set(block.id, element);
-                                } else {
-                                  workspaceSlotRefs.current.delete(block.id);
-                                }
-                              }}
-                              className={`workspace-slot ${isSlotActive ? 'workspace-slot--active' : ''}`}
-                            >
+                              <div
+                                ref={(element) => {
+                                  if (element) {
+                                    workspaceSlotRefs.current.set(block.id, element);
+                                  } else {
+                                    workspaceSlotRefs.current.delete(block.id);
+                                  }
+                                }}
+                                className={`workspace-slot ${isSlotActive ? 'workspace-slot--active' : ''}`}
+                                style={slotStyle}
+                              >
                                 <div className="workspace-slot__rail">
                                   <span className="workspace-slot__dot" aria-hidden />
                                 </div>
                                 <div
                                   onPointerDown={(event) => handleWorkspacePointerDown(event, index)}
-                                  className={`workspace-block ${isDragging ? 'workspace-block--dragging' : ''}`}
-                                  style={{ backgroundColor: background }}
+                                  className={blockClassName}
+                                  style={blockStyle}
                                 >
                                   <div className="flex flex-col gap-0.5">
-                                    <span className="tracking-wide font-semibold">{label}</span>
-                                    <span className="text-[10px] text-white/80 uppercase tracking-wide">{paletteBlock?.group ?? "ブロック"}</span>
+                                    {isIfBlock ? (
+                                      <div className="workspace-condition-control">
+                                        <span className="workspace-condition-text">もし</span>
+                                        <div className="workspace-condition-select-wrapper">
+                                          <select
+                                            className="workspace-condition-select"
+                                            value={selectedConditionId}
+                                            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
+                                              handleConditionSelect(block.id, event.target.value as ScratchBlockId);
+                                            }}
+                                            onPointerDown={(event) => event.stopPropagation()}
+                                            onMouseDown={(event) => event.stopPropagation()}
+                                          >
+                                            <option value="" disabled>
+                                              条件を選ぶ
+                                            </option>
+                                            {conditionPaletteItems.map((item) => (
+                                              <option key={item.id} value={item.id}>
+                                                {item.label}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                        <span className="workspace-condition-text">なら</span>
+                                      </div>
+                                    ) : isForBlock ? (
+                                      <div className="workspace-loop-control">
+                                        <span className="workspace-loop-text">for</span>
+                                        <input
+                                          type="number"
+                                          min={MIN_CONTROL_FOR_LOOP_COUNT}
+                                          max={MAX_CONTROL_FOR_LOOP_COUNT}
+                                          step={1}
+                                          className="workspace-loop-input"
+                                          value={loopCount ?? DEFAULT_CONTROL_FOR_LOOP_COUNT}
+                                          onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                                            handleLoopCountChange(block.id, event.target.value);
+                                          }}
+                                          onPointerDown={(event) => event.stopPropagation()}
+                                          onMouseDown={(event) => event.stopPropagation()}
+                                          aria-label="for文のくり返し回数"
+                                        />
+                                        <span className="workspace-loop-text">回くり返す</span>
+                                      </div>
+                                    ) : (
+                                      <span className="tracking-wide font-semibold">{label}</span>
+                                    )}
+                                    <span className="text-[10px] text-white/80 uppercase tracking-wide">{paletteBlock?.group ?? 'ブロック'}</span>
                                   </div>
                                   <button
                                     type="button"
@@ -902,7 +1324,7 @@ const ChallengeEditor = () => {
                           className="stage-preview__cat"
                           style={{ '--cat-x': `${stageCatX}px`, '--cat-y': `${stageCatY}px` } as CSSProperties}
                         >
-                          <span role="img" aria-label="cat">🐱</span>
+                          <img src={stageCharacterImg} alt="ステージキャラクター" />
                           {stageSpeech && (
                             <div className="stage-preview__speech">
                               <span>{stageSpeech}</span>
