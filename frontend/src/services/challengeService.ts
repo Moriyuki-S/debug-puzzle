@@ -1,7 +1,7 @@
 import { Challenge } from '../types/challenge';
 import { challengesData } from '../challengesData';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8080';
 
 class ChallengeService {
   async getAllChallenges(): Promise<Challenge[]> {

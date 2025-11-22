@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-PORT: int = 8000
+PORT: int = 8080
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 SYSTEM_INSTRUNCTION: str = """\
