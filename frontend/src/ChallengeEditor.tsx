@@ -20,9 +20,12 @@ type ScratchBlockId =
   | 'looks_hello'
   | 'looks_goal'
   | 'looks_jump'
+  | 'looks_arrived'
   | 'control_for_loop'
   | 'control_if_goal'
-  | 'condition_goal_reached';
+  | 'condition_goal_reached'
+  | 'dummy_flash'
+  | 'dummy_spiral';
 
 type WorkspaceBlockType = ScratchBlockId | 'control_end';
 
@@ -84,15 +87,35 @@ const paletteItems: ScratchPaletteItem[] = [
   { id: 'looks_hello', label: '「こんにちは！」と言う', color: '#9966FF', group: '見た目' },
   { id: 'looks_goal', label: '「着いたよ！」と言う', color: '#9966FF', group: '見た目' },
   { id: 'looks_jump', label: '「ジャンプ成功！」と言う', color: '#9966FF', group: '見た目' },
+  { id: 'looks_arrived', label: '「ゴールついたよ！」と言う', color: '#9966FF', group: '見た目' },
   { id: 'control_for_loop', label: CONTROL_FOR_LOOP_PALETTE_LABEL, color: '#FFAB19', group: 'コントロール' },
   { id: 'control_if_goal', label: 'もし [条件] なら', color: '#FFAB19', group: 'コントロール' },
   { id: 'condition_goal_reached', label: 'ゴールした？', color: '#FACC15', group: '条件' },
+  { id: 'dummy_flash', label: 'ダミー: 光るボタン', color: '#CBD5E1', group: 'ダミー' },
+  { id: 'dummy_spiral', label: 'ダミー: くるくる回る', color: '#CBD5E1', group: 'ダミー' },
 ];
 
 const conditionPaletteItems = paletteItems.filter((item) => item.group === '条件');
 const conditionBlockIdSet = new Set<ScratchBlockId>(conditionPaletteItems.map((item) => item.id));
 
-const groupOrder: Array<ScratchPaletteItem['group']> = ['イベント', 'モーション', '見た目', 'コントロール', '条件'];
+const groupOrder: Array<ScratchPaletteItem['group']> = ['イベント', 'モーション', '見た目', 'コントロール', 'ダミー', '条件'];
+
+const defaultPaletteIds: ScratchBlockId[] = [
+  'event_flag',
+  'motion_move',
+  'motion_move_small',
+  'motion_change_y',
+  'motion_set_y_zero',
+  'looks_hello',
+  'looks_goal',
+  'looks_jump',
+  'control_for_loop',
+  'control_if_goal',
+];
+
+const challengePaletteWhitelist: Record<string, ScratchBlockId[]> = {
+  'scratch-boss-run': [...defaultPaletteIds, 'dummy_flash', 'dummy_spiral'],
+};
 
 type ProgramNode = {
   type: ScratchBlockId;
@@ -221,11 +244,134 @@ const newBlockId = (() => {
   };
 })();
 
+const allowedWorkspaceTypes = new Set<WorkspaceBlockType>([
+  'event_flag',
+  'motion_move',
+  'motion_move_small',
+  'motion_change_y',
+  'motion_set_y_zero',
+  'looks_hello',
+  'looks_goal',
+  'looks_jump',
+  'looks_arrived',
+  'control_for_loop',
+  'control_if_goal',
+  'condition_goal_reached',
+  'control_end',
+  'dummy_flash',
+  'dummy_spiral',
+]);
+
+const hydrateGeneratedBlocks = (rawBlocks: unknown[]): WorkspaceBlock[] => {
+  if (!Array.isArray(rawBlocks)) return [];
+
+  const result: WorkspaceBlock[] = [];
+  let openControls = 0;
+
+  rawBlocks.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') {
+      return;
+    }
+    const blockType = (entry as Record<string, unknown>).type;
+    if (typeof blockType !== 'string') {
+      return;
+    }
+    if (!allowedWorkspaceTypes.has(blockType as WorkspaceBlockType)) {
+      return;
+    }
+
+    if (blockType === 'control_end') {
+      if (openControls > 0) {
+        openControls -= 1;
+        result.push({ id: newBlockId(), type: 'control_end' });
+      }
+      return;
+    }
+
+    const base: WorkspaceBlock = { id: newBlockId(), type: blockType as WorkspaceBlockType };
+    if (blockType === 'control_for_loop' && typeof (entry as Record<string, unknown>).loopCount === 'number') {
+      base.loopCount = (entry as Record<string, number>).loopCount;
+    }
+    if (blockType === 'control_if_goal') {
+      const candidate = (entry as Record<string, unknown>).conditionId;
+      if (typeof candidate === 'string' && conditionBlockIdSet.has(candidate as ScratchBlockId)) {
+        base.conditionId = candidate as ScratchBlockId;
+      }
+    }
+
+    result.push(base);
+    if (isControlStartBlock(base.type)) {
+      openControls += 1;
+    }
+  });
+
+  while (openControls > 0) {
+    result.push({ id: newBlockId(), type: 'control_end' });
+    openControls -= 1;
+  }
+
+  return result;
+};
+
+const ensureEventFlag = (blocks: WorkspaceBlock[]): WorkspaceBlock[] => {
+  if (blocks.length === 0) {
+    return [{ id: newBlockId(), type: 'event_flag' }];
+  }
+  if (blocks[0].type !== 'event_flag') {
+    return [{ id: newBlockId(), type: 'event_flag' }, ...blocks];
+  }
+  return blocks;
+};
+
+const generateBuggyWorkspace = (challengeId?: string): WorkspaceBlock[] => {
+  const createBlock = (type: WorkspaceBlockType, extras?: Partial<WorkspaceBlock>): WorkspaceBlock => ({
+    id: newBlockId(),
+    type,
+    ...extras,
+  });
+
+  switch (challengeId) {
+    case 'scratch-greeting':
+      // Missing the greeting block on purpose.
+      return [createBlock('event_flag'), createBlock('motion_move_small')];
+    case 'scratch-walk':
+      // Not enough steps to reach 30; still says arrived.
+      return [
+        createBlock('event_flag'),
+        createBlock('motion_move'),
+        createBlock('motion_move'),
+        createBlock('looks_goal'),
+      ];
+    case 'scratch-jump':
+      // Jumps up but never resets y to 0.
+      return [createBlock('event_flag'), createBlock('motion_change_y'), createBlock('looks_jump')];
+    case 'scratch-control-loop': {
+      // Loops only 3 times and leaves the if-condition empty to surface an error.
+      const loopStart = createBlock('control_for_loop', { loopCount: 3 });
+      const loopEnd = createBlock('control_end');
+      const ifStart = createBlock('control_if_goal');
+      const ifEnd = createBlock('control_end');
+      return [
+        createBlock('event_flag'),
+        loopStart,
+        createBlock('motion_move'),
+        loopEnd,
+        ifStart,
+        createBlock('looks_goal'),
+        ifEnd,
+      ];
+    }
+    default:
+      return [createBlock('event_flag')];
+  }
+};
+
 type TestResult = {
   status: 'success' | 'failure' | 'error';
   message: string;
   testCase: number | string;
   state?: ScratchState;
+  trace?: ScratchState[];
 };
 
 type ScratchState = {
@@ -257,6 +403,15 @@ const createInitialState = (overrides?: Partial<ScratchState>): ScratchState => 
   return base;
 };
 
+const cloneState = (state: ScratchState): ScratchState => ({
+  x: state.x,
+  y: state.y,
+  moveTotal: state.moveTotal,
+  maxY: state.maxY,
+  minY: state.minY,
+  messages: [...state.messages],
+});
+
 const updateVerticalExtremes = (state: ScratchState) => {
   if (state.y > state.maxY) {
     state.maxY = state.y;
@@ -268,8 +423,9 @@ const updateVerticalExtremes = (state: ScratchState) => {
 
 const runWorkspaceProgram = (
   blocks: WorkspaceBlock[],
-  overrides?: Partial<ScratchState>
-): { state?: ScratchState; error?: string } => {
+  overrides?: Partial<ScratchState>,
+  recordTrace = false
+): { state?: ScratchState; error?: string; trace?: ScratchState[] } => {
   if (!blocks.length) {
     return { error: 'まずはブロックを配置してみよう！' };
   }
@@ -285,6 +441,13 @@ const runWorkspaceProgram = (
 
   const state = createInitialState(overrides);
   let eventSeen = false;
+  const trace: ScratchState[] = recordTrace ? [cloneState(state)] : [];
+
+  const pushTrace = () => {
+    if (recordTrace) {
+      trace.push(cloneState(state));
+    }
+  };
 
   const evaluateCondition = (conditionId?: ScratchBlockId): { error?: string; value?: boolean } => {
     if (!conditionId) {
@@ -305,31 +468,48 @@ const runWorkspaceProgram = (
           return { error: 'イベントブロックは一番上の1つだけにしよう！' };
         }
         eventSeen = true;
+        pushTrace();
         return {};
       case 'motion_move':
         state.x += 10;
         state.moveTotal += 10;
+        pushTrace();
         return {};
       case 'motion_move_small':
         state.x += 3;
         state.moveTotal += 3;
+        pushTrace();
         return {};
       case 'motion_change_y':
         state.y += 50;
         updateVerticalExtremes(state);
+        pushTrace();
         return {};
       case 'motion_set_y_zero':
         state.y = 0;
         updateVerticalExtremes(state);
+        pushTrace();
         return {};
       case 'looks_hello':
         state.messages.push('こんにちは！');
+        pushTrace();
         return {};
       case 'looks_goal':
         state.messages.push('着いたよ！');
+        pushTrace();
         return {};
       case 'looks_jump':
         state.messages.push('ジャンプ成功！');
+        pushTrace();
+        return {};
+      case 'looks_arrived':
+        state.messages.push('ゴールついたよ！');
+        pushTrace();
+        return {};
+      case 'dummy_flash':
+      case 'dummy_spiral':
+        // No-op dummy block
+        pushTrace();
         return {};
       case 'control_for_loop': {
         if (node.children.length === 0) {
@@ -352,6 +532,7 @@ const runWorkspaceProgram = (
         if (conditionResult.value) {
           if (node.children.length === 0) {
             state.messages.push(CONTROL_GOAL_MESSAGE);
+            pushTrace();
             return {};
           }
           return executeNodes(node.children);
@@ -384,7 +565,7 @@ const runWorkspaceProgram = (
     return { error: '一番上には「⚑ が押されたとき」を置いてみよう！' };
   }
 
-  return { state };
+  return { state, trace: recordTrace ? trace : undefined };
 };
 
 const checkExpectation = (state: ScratchState, expected: unknown) => {
@@ -441,6 +622,10 @@ const ChallengeEditor = () => {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [isDraggingBlock, setIsDraggingBlock] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiGenerateError, setAiGenerateError] = useState('');
+  const [replayIndex, setReplayIndex] = useState(0);
+  const [isReplaying, setIsReplaying] = useState(false);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [selectedResultIndex, setSelectedResultIndex] = useState(0);
   const [runError, setRunError] = useState<string>('');
@@ -480,21 +665,54 @@ const ChallengeEditor = () => {
   }, [themeId]);
 
   useEffect(() => {
+    let isCancelled = false;
+    const seedWorkspace = async () => {
+      if (!challenge) return;
+      setAiGenerating(true);
+      setAiGenerateError('');
+      try {
+        const generated = await challengeService.generateWorkspace(challenge);
+        const hydrated = ensureEventFlag(hydrateGeneratedBlocks(generated?.blocks ?? []));
+        if (!isCancelled && hydrated.length > 0) {
+          setWorkspace(hydrated);
+          setAiGenerating(false);
+          return;
+        }
+      } catch (error) {
+        console.warn('Failed to generate AI workspace, falling back to local template.', error);
+        if (!isCancelled) {
+          setAiGenerateError('AI生成に失敗したのでテンプレートで初期化しました。');
+        }
+      }
+      if (!isCancelled) {
+        setWorkspace(generateBuggyWorkspace(challenge.id));
+        setAiGenerating(false);
+      }
+    };
+    seedWorkspace();
+    return () => {
+      isCancelled = true;
+    };
+  }, [challenge]);
+
+  useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   const groupedPalette = useMemo(() => {
+    const allowedIds = new Set(challengePaletteWhitelist[challenge?.id ?? 'default'] ?? defaultPaletteIds);
+    const paletteForChallenge = paletteItems.filter((item) => allowedIds.has(item.id));
     return groupOrder
       .map((group) => ({
         group,
-        items: paletteItems.filter(
+        items: paletteForChallenge.filter(
           (item) =>
             item.group === group &&
             group !== '条件'
         ),
       }))
       .filter((section) => section.items.length > 0);
-  }, []);
+  }, [challenge]);
 
   const { blockIndentMap, slotIndentLevels } = useMemo(() => computeIndentationGuides(workspace), [workspace]);
 
@@ -923,12 +1141,12 @@ const ChallengeEditor = () => {
     const results: TestResult[] = [];
 
     if (testCases.length === 0) {
-      const single = runWorkspaceProgram(workspace);
+      const single = runWorkspaceProgram(workspace, undefined, true);
       if (single.error) {
         results.push({ status: 'error', message: single.error, testCase: '-' });
         setRunError(single.error);
       } else if (single.state) {
-        results.push({ status: 'success', message: '自由に動かせたね！', testCase: '-', state: single.state });
+        results.push({ status: 'success', message: '自由に動かせたね！', testCase: '-', state: single.state, trace: single.trace });
       }
     } else {
       testCases.forEach((testCase, index) => {
@@ -936,7 +1154,7 @@ const ChallengeEditor = () => {
           Array.isArray(testCase.input) && testCase.input.length > 0
             ? (testCase.input[0] as Partial<ScratchState>)
             : undefined;
-        const outcome = runWorkspaceProgram(workspace, overrides);
+        const outcome = runWorkspaceProgram(workspace, overrides, true);
         if (outcome.error) {
           results.push({
             status: 'error',
@@ -952,6 +1170,7 @@ const ChallengeEditor = () => {
             message: expectation.message,
             testCase: index + 1,
             state: outcome.state,
+            trace: outcome.trace,
           });
         }
       });
@@ -1004,12 +1223,47 @@ const ChallengeEditor = () => {
     ? Math.min(selectedResultIndex, testResults.length - 1)
     : 0;
   const selectedResult = testResults[resolvedSelectedIndex] ?? null;
-  const selectedState = selectedResult?.state;
+  const activeTrace = selectedResult?.trace ?? [];
+  const hasTrace = activeTrace.length > 0;
+  const animatedState = hasTrace ? activeTrace[Math.min(replayIndex, activeTrace.length - 1)] : null;
+  const selectedState = animatedState ?? selectedResult?.state;
   const stageCatX = selectedState ? Math.max(-120, Math.min(120, selectedState.x * 4)) : 0;
   const stageCatY = selectedState ? Math.max(-60, Math.min(60, -selectedState.y * 1.5)) : 0;
   const stageSpeech = selectedState && selectedState.messages.length > 0
     ? selectedState.messages[selectedState.messages.length - 1]
     : '';
+  const selectedStatus = selectedResult?.status ?? null;
+  const statusTone =
+    selectedStatus === 'success'
+      ? { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-800', label: '成功' }
+      : selectedStatus === 'failure'
+        ? { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', label: '要チェック' }
+        : selectedStatus === 'error'
+          ? { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', label: 'エラー' }
+          : null;
+
+  useEffect(() => {
+    if (!hasTrace) {
+      setReplayIndex(0);
+      setIsReplaying(false);
+      return;
+    }
+    setReplayIndex(0);
+    setIsReplaying(true);
+    let current = 0;
+    const timer = window.setInterval(() => {
+      current += 1;
+      if (current >= activeTrace.length) {
+        window.clearInterval(timer);
+        setIsReplaying(false);
+        return;
+      }
+      setReplayIndex(current);
+    }, 400);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [hasTrace, activeTrace]);
 
   if (isLoading || !challenge) {
     return (
@@ -1113,18 +1367,46 @@ const ChallengeEditor = () => {
                   <span className="font-semibold">ワークスペース</span>
                 </div>
                 <div className="flex-1 bg-slate-50 p-4">
+                <div className="flex flex-col gap-2 mb-3">
+                  {aiGenerating ? (
+                    <div className="flex items-center gap-3 text-sm text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                      <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" aria-hidden />
+                      <span className="font-semibold">AIがブロックを生成中...</span>
+                      <div className="flex-1 h-1 bg-indigo-100 rounded-full overflow-hidden">
+                        <div className="h-full w-2/3 bg-indigo-400 animate-pulse" />
+                      </div>
+                    </div>
+                  ) : null}
+                  {aiGenerateError ? (
+                    <div className="text-xs text-orange-700 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
+                      {aiGenerateError}
+                    </div>
+                  ) : null}
+                </div>
                 <div
                   ref={workspaceAreaRef}
                   className={workspaceAreaClass}
                 >
                     {workspace.length === 0 ? (
-                      <div
-                        className={`workspace-drop-empty ${isDraggingBlock ? 'workspace-drop-empty--active' : ''}`}
-                      >
-                        <PlayCircle className="w-6 h-6" />
-                        <p className="font-semibold">ここにブロックをドロップ！</p>
-                        <p className="text-xs opacity-80">左のパレットからドラッグしてみよう</p>
-                      </div>
+                      aiGenerating ? (
+                        <div className="space-y-3">
+                          {[1, 2, 3].map((key) => (
+                            <div
+                              key={key}
+                              className="h-12 w-full rounded-lg bg-white/80 border border-slate-200 shadow-sm animate-pulse"
+                              style={{ minWidth: '320px' }}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div
+                          className={`workspace-drop-empty ${isDraggingBlock ? 'workspace-drop-empty--active' : ''}`}
+                        >
+                          <PlayCircle className="w-6 h-6" />
+                          <p className="font-semibold">ここにブロックをドロップ！</p>
+                          <p className="text-xs opacity-80">左のパレットからドラッグしてみよう</p>
+                        </div>
+                      )
                     ) : (
                       <>
                         {renderDropGuide(0)}
@@ -1310,8 +1592,18 @@ const ChallengeEditor = () => {
                   </div>
 
                   {runError && (
-                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                       {runError}
+                    </div>
+                  )}
+
+                  {selectedResult && statusTone && (
+                    <div className={`rounded-xl border px-4 py-3 text-sm ${statusTone.bg} ${statusTone.border} ${statusTone.text}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold uppercase tracking-wide">テスト {selectedResult.testCase}</span>
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-white/70">{statusTone.label}</span>
+                      </div>
+                      <p className="leading-relaxed whitespace-pre-wrap">{selectedResult.message}</p>
                     </div>
                   )}
 
@@ -1320,6 +1612,11 @@ const ChallengeEditor = () => {
                       <div className="stage-preview__scene">
                         <div className="stage-preview__sky" aria-hidden />
                         <div className="stage-preview__ground" aria-hidden />
+                        {isReplaying && (
+                          <div className="absolute top-2 right-2 text-[11px] font-semibold text-indigo-900 bg-white/80 px-2 py-1 rounded-full shadow">
+                            再生中...
+                          </div>
+                        )}
                         <div
                           className="stage-preview__cat"
                           style={{ '--cat-x': `${stageCatX}px`, '--cat-y': `${stageCatY}px` } as CSSProperties}

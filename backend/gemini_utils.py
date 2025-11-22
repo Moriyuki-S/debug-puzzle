@@ -161,6 +161,72 @@ def generate_code_logic(
     }
 
 
+def generate_workspace_logic(challenge: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate a buggy Scratch-style workspace sequence."""
+    instructions = challenge.get("instructions", "")
+    examples = challenge.get("examples", "")
+    title = challenge.get("title", "")
+    description = challenge.get("description", "")
+
+    prompt = textwrap.dedent(
+        f"""
+        あなたは子ども向けのビジュアルプログラミング教材で、Scratch 風のブロック並びを考えるアシスタントです。
+        与えられた課題の説明・例をもとに、あえて「1つ以上のミス」を含むブロック並びを JSON で返してください。
+
+        制約:
+        - ブロックの種類 (type):
+          event_flag / motion_move / motion_move_small / motion_change_y / motion_set_y_zero /
+          looks_hello / looks_goal / looks_jump / control_for_loop / control_if_goal / condition_goal_reached / control_end
+        - control_for_loop には必要なら loopCount を数値で付けられます (省略可)。
+        - control_if_goal には conditionId を "condition_goal_reached" で付けられます (省略可)。
+        - control_for_loop と control_if_goal の終わりには control_end を入れてください。
+        - 必ず event_flag を最初に含めてください。
+        - 並びは配列で、上から順に実行されると考えてください。
+        - 少なくとも 1 箇所は課題を満たさないミスを入れてください（例: 足りない回数、条件未設定、リセットしない等）。
+
+        出力フォーマット（JSONのみ）:
+        {{
+          "blocks": [
+            {{"type": "event_flag"}},
+            {{"type": "control_for_loop", "loopCount": 3}},
+            {{"type": "motion_move"}},
+            {{"type": "control_end"}},
+            ...
+          ]
+        }}
+
+        課題タイトル: {title}
+        課題説明: {description}
+        課題インストラクション: {instructions}
+        例: {examples}
+        """
+    ).strip()
+
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[prompt],
+        config=types.GenerateContentConfig(
+          temperature=0.7,
+          system_instruction="Return JSON only.",
+          response_mime_type="application/json",
+        ),
+    )
+
+    try:
+        payload = json.loads(response.text)  # type: ignore[arg-type]
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"JSON decode failed: {exc}") from exc
+
+    if not isinstance(payload, dict) or "blocks" not in payload:
+        raise ValueError("生成結果が不正です。blocks 配列を含む JSON を返してください。")
+
+    blocks = payload.get("blocks")
+    if not isinstance(blocks, list):
+        raise ValueError("blocks は配列である必要があります。")
+
+    return {"blocks": blocks}
+
+
 def _build_test_results_summary(test_results: List[Dict[str, Any]]) -> str:
     summary = ""
     for i, result in enumerate(test_results):

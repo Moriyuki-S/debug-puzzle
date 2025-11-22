@@ -12,6 +12,7 @@ from gemini_utils import (
     generate_hint_logic,
     generate_explanation_logic,
     generate_retire_explanation_logic,
+    generate_workspace_logic,
 )
 from starlette.responses import JSONResponse, StreamingResponse
 
@@ -181,6 +182,16 @@ def generate_retire_explanation(payload: dict[str, Any] = Body(...)) -> JSONResp
         return JSONResponse(content=explanation)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@app.post("/api/generate-workspace")
+def generate_workspace(payload: dict[str, Any] = Body(...)) -> JSONResponse:
+    challenge: dict[str, Any] = payload.get("challenge", {})
+    try:
+        result = generate_workspace_logic(challenge)
+        return JSONResponse(content=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate workspace: {str(e)}")
 
 
 if __name__ == "__main__":

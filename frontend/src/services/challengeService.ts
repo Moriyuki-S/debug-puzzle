@@ -90,6 +90,20 @@ class ChallengeService {
       throw error;
     }
   }
+
+  async generateWorkspace(challenge: Challenge): Promise<{ blocks: any[] }> {
+    const response = await fetch(`${API_BASE_URL}/api/generate-workspace`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challenge }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to generate workspace: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
 }
 
 export const challengeService = new ChallengeService();
