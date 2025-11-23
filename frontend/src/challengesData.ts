@@ -9,11 +9,7 @@ export const challengesData: Challenge[] = [
     difficulty: '入門',
     image: 'images/character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `緑の旗を押したら、ねこが「こんにちは！」とあいさつするスクリプトを作ろう。
-
-【ポイント】
-・イベントカテゴリの「⚑ が押されたとき」をいちばん上に置く
-・見た目カテゴリの「「～」と言う」でセリフを設定する`,
+    instructions: `緑の旗を押したらその場で「こんにちは！」と言わせよう。右にも上にも動かさず、あいさつだけでOK。`,
     examples: '',
     video: '',
     testCases: [
@@ -30,23 +26,19 @@ export const challengesData: Challenge[] = [
     id: 'scratch-walk',
     title: 'おさんぽチャレンジ',
     description:
-      'ねこを合計30歩前に進ませて、ゴールについたことを報告しよう。',
+      'ねこを右へ何回か進ませてゴールについたことを報告しよう。',
     difficulty: '入門',
     image: 'images/sum_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `緑の旗を押したら合計30歩うごかして「着いたよ！」と言ってみよう。
-
-【ポイント】
-・モーション「～歩うごかす」を組み合わせて合計30にする
-・最後に「着いたよ！」と言う`,
+    instructions: `緑の旗のあと、右に3回進んでゴールし、「着いたよ！」と伝えよう。上には動かさないでOK。`,
     examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          x: 30,
-          moveTotal: 30,
+          x: 3,
+          moveTotal: 3,
           messageIncludes: '着いたよ！'
         }
       }
@@ -56,24 +48,18 @@ export const challengesData: Challenge[] = [
     id: 'scratch-jump',
     title: 'ジャンプで着地しよう',
     description:
-      'ジャンプして地面に戻ってきたら「ジャンプ成功！」と言わせよう。',
+      'ジャンプして「ジャンプ成功！」と言わせよう。',
     difficulty: '初級',
     image: 'images/reverse_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `緑の旗を押したら、上に50上がって、地面(y=0)に戻り、「ジャンプ成功！」と言わせよう。
-
-【ポイント】
-・「y座標を〜ずつ変える」でジャンプ
-・「y座標を〜にする」で元の位置へ戻す
-・最後にセリフを追加`,
+    instructions: `緑の旗のあと、「ジャンプする」を2回使ってから「ジャンプ成功！」と言わせよう。右には動かさなくてOK。`,
     examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          maxY: 50,
-          y: 0,
+          jumpCount: 2,
           messageIncludes: 'ジャンプ成功！'
         }
       }
@@ -83,24 +69,19 @@ export const challengesData: Challenge[] = [
     id: 'scratch-control-loop',
     title: 'くり返しでゴールを見つけよう',
     description:
-      'for 文のブロックを使って、ゴール地点(40歩)まで進み、条件付きで報告してみよう。',
+      'for 文のブロックを使って、右へ決まった回数だけ進み、条件付きで報告してみよう。',
     difficulty: '初級',
     image: 'images/character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `緑の旗を押したら、コントロールカテゴリのブロックでゴールまで進もう。
-
-【ポイント】
-・「for (回数を選んでくり返す)」の下に「10歩うごかす」をインデントして入れよう（回数欄で 4 を選ぼう。終わりは自動で閉じるよ）
-・「もし [条件] なら」のドロップダウンから「ゴールした？」を選んでみよう
-・条件が真になったら「着いたよ！」と言わせたり、空にして自動メッセージでも OK`,
+    instructions: `緑の旗のあと、くり返しブロックで右へ4回進み、最後に「ゴールした？」で判定してゴールできたら自動で報告しよう。上方向には動かさない。`,
     examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          x: 40,
-          moveTotal: 40,
+          x: 4,
+          moveTotal: 4,
           messageIncludes: 'ゴールできたよ！',
           lastMessage: 'ゴールできたよ！'
         }
@@ -111,27 +92,20 @@ export const challengesData: Challenge[] = [
     id: 'scratch-boss-run',
     title: 'ゴールまで一気にダッシュ！',
     description:
-      '連続ジャンプとループを組み合わせて、最短手数でゴールにたどり着こう。',
+      '右へ大きく進みながら途中でジャンプし、ゴールしたかを確認しよう。',
     difficulty: '中級',
     image: 'images/reverse_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `緑の旗を押したら、まとめて60歩進み、ジャンプを2回してから着地し、最後にゴールメッセージを出そう。
-
-【ポイント】
-・forブロックで「10歩うごかす」を6回まとめて実行しよう
-・ジャンプは「y座標を 50 ずつ変える」を2回、その後「y座標を 0 にする」で着地
-・条件ブロックは「ゴールした？」を選ぶと自動で「ゴールできたよ！」と言ってくれるよ
-・ダミーブロック（光るボタン/くるくる回る）は今回は使わなくてOK`,
+    instructions: `緑の旗のあと、右に6回進み、途中で「ジャンプする」を2回使ってから「ゴールした？」で判定してゴールできたらメッセージを出そう。`,
     examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          x: 60,
-          moveTotal: 60,
-          maxY: 100,
-          y: 0,
+          x: 6,
+          moveTotal: 6,
+          jumpCount: 2,
           messageIncludes: 'ゴールできたよ！',
           lastMessage: 'ゴールできたよ！'
         }
@@ -142,27 +116,20 @@ export const challengesData: Challenge[] = [
     id: 'scratch-checkpoint-report',
     title: '途中報告しながらゴールしよう',
     description:
-      '小さく動きながらあいさつし、ジャンプで段差を越えつつゴールできたことを報告しよう。',
+      '右に進んであいさつし、ジャンプしたあとゴールできたことを報告しよう。',
     difficulty: '中級',
     image: 'images/sum_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `緑の旗を押したら、次の順番で進めよう。
-
-【ポイント】
-・まず小さく1歩(3歩うごかす)動いてから「こんにちは！」と言う
-・for (回数を選んでくり返す) で合計40歩進むように中に「10歩うごかす」を入れる（回数は4）
-・途中で1回ジャンプして(maxYを50にする)、着地してから条件のメッセージを出す
-・「もし [条件] なら」で「ゴールした？」を選び、最後のメッセージを「ゴールできたよ！」にしよう`,
+    instructions: `緑の旗のあと、右に進んで「こんにちは！」と言い、「ジャンプする」を1回使おう。その後はくり返しで右へ進み、最後に「ゴールした？」でゴールできたことを報告しよう。`,
     examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          x: 43,
-          moveTotal: 43,
-          maxY: 50,
-          y: 0,
+          x: 4,
+          moveTotal: 4,
+          jumpCount: 1,
           messageIncludes: 'こんにちは！',
           lastMessage: 'ゴールできたよ！'
         }
@@ -173,27 +140,20 @@ export const challengesData: Challenge[] = [
     id: 'scratch-double-jump-guard',
     title: '二段ジャンプでゴール確認',
     description:
-      '二段ジャンプで高い段差を越えつつ、ゴールしたかを最後にチェックしよう。',
+      '右へ進んでからジャンプして、ゴールしたかを最後にチェックしよう。',
     difficulty: '上級',
     image: 'images/reverse_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `緑の旗を押したら、二段ジャンプで高所を越え、着地後にゴール判定をしよう。
-
-【ポイント】
-・最初に小刻みな前進（3歩うごかすを2回など）でウォームアップ
-・ジャンプは「y座標を 50 ずつ変える」を2回続けて、高さ100を記録したら「y座標を 0 にする」で必ず着地する
-・for (回数を選んでくり返す) の中に「10歩うごかす」を入れ、合計でゴール(x>=40)に届かせる
-・「もし [条件] なら」で「ゴールした？」を選び、最後のメッセージを「ゴールできたよ！」にしよう`,
+    instructions: `緑の旗のあと、右に2回進んでから「ジャンプする」を2回使い、続けてくり返しで右へ進み、最後は「ゴールした？」でゴールを確認して報告しよう。`,
     examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          x: 46,
-          moveTotal: 46,
-          maxY: 100,
-          y: 0,
+          x: 5,
+          moveTotal: 5,
+          jumpCount: 2,
           messageIncludes: 'ゴールできたよ！',
           lastMessage: 'ゴールできたよ！'
         }
@@ -204,19 +164,18 @@ export const challengesData: Challenge[] = [
     id: 'scratch-jump-landing',
     title: '二段ジャンプで着地！',
     description:
-      'ジャンプを2回してから地面に戻り、成功メッセージを出そう。',
+      'その場で2回ジャンプしてから、成功メッセージを出そう。',
     difficulty: '初級',
     image: 'images/character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `緑の旗のあとにジャンプを2回してからy=0に戻し、「ジャンプ成功！」と言わせよう。`,
+    instructions: `緑の旗のあと、「ジャンプする」を2回使ってから「ジャンプ成功！」と言わせよう。`,
     examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          maxY: 100,
-          y: 0,
+          jumpCount: 2,
           messageIncludes: 'ジャンプ成功！',
           lastMessage: 'ジャンプ成功！'
         }
@@ -225,21 +184,21 @@ export const challengesData: Challenge[] = [
   },
   {
     id: 'scratch-speed-run',
-    title: '50歩スプリント',
+    title: 'スプリント',
     description:
-      'まとめて50歩進んで、ゴール判定でメッセージを出そう。',
+      '右にしっかり進んで、ゴール判定でメッセージを出そう。',
     difficulty: '初級',
     image: 'images/sum_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `forブロックで「10歩うごかす」を5回くり返し、条件を「ゴールした？」にしてゴールメッセージを出そう。`,
+    instructions: `緑の旗のあと、くり返しで右へ進み、上方向には動かさず「ゴールした？」でゴールを伝えよう。`,
     examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          x: 50,
-          moveTotal: 50,
+          x: 5,
+          moveTotal: 5,
           messageIncludes: 'ゴールできたよ！',
           lastMessage: 'ゴールできたよ！'
         }
@@ -248,21 +207,21 @@ export const challengesData: Challenge[] = [
   },
   {
     id: 'scratch-mini-steps',
-    title: 'こまかく歩こう',
+    title: 'こまかく進もう',
     description:
-      '小さい歩幅で合計12歩進み、到着を報告しよう。',
+      '小さい動きを重ねて進み、到着を報告しよう。',
     difficulty: '入門',
     image: 'images/character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `「3歩うごかす」を4回くり返して合計12歩進み、最後に「着いたよ！」と言わせよう。`,
+    instructions: `緑の旗のあと、小さく右に進み続けてゴールし、上は動かさず「着いたよ！」と言わせよう。`,
     examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          x: 12,
-          moveTotal: 12,
+          x: 1,
+          moveTotal: 1,
           lastMessage: '着いたよ！',
           messageIncludes: '着いたよ！'
         }
@@ -277,15 +236,14 @@ export const challengesData: Challenge[] = [
     difficulty: '入門',
     image: 'images/character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `最初に「こんにちは！」と言い、ジャンプでyを50上げてから0に戻し、最後に「ジャンプ成功！」と言おう。`,
+    instructions: `緑の旗のあと、まず「こんにちは！」と言い、「ジャンプする」を1回使って最後に「ジャンプ成功！」と言おう。`,
     examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          maxY: 50,
-          y: 0,
+          jumpCount: 1,
           messageIncludes: 'ジャンプ成功！',
           lastMessage: 'ジャンプ成功！'
         }
@@ -296,19 +254,19 @@ export const challengesData: Challenge[] = [
     id: 'scratch-loop-mix',
     title: 'ミックスループチャレンジ',
     description:
-      '大きな歩きと小さな歩きを組み合わせて合計29歩進もう。',
+      '大きな前進と小さな前進を組み合わせて進もう。',
     difficulty: '初級',
     image: 'images/sum_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `forで「10歩うごかす」を2回くり返し、そのあと別のforで「3歩うごかす」を3回くり返してみよう。`,
+    instructions: `緑の旗のあと、大きく右に進むくり返しと小さく右に進むくり返しをつなげて、上には動かさずゴールを目指そう。`,
     examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          x: 29,
-          moveTotal: 29
+          x: 3,
+          moveTotal: 3
         }
       }
     ]
@@ -321,31 +279,16 @@ export const challengesData: Challenge[] = [
     difficulty: '中級',
     image: 'images/character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `緑の旗を押したら、次の順で動かそう。
-
-【ポイント】
-・最初に「3歩うごかす」で少し進んでから「こんにちは！」と言う
-・ジャンプは「y座標を 50 ずつ変える」→「y座標を 0 にする」で必ず着地
-・for (回数を選んでくり返す) の中に「10歩うごかす」を入れてゴールに届かせる（回数は4）
-・「もし [条件] なら」で「ゴールした？」を選び、最後は自動メッセージ「ゴールできたよ！」を出そう`,
-    examples: `例のブロック並び:
-1. ⚑ が押されたとき
-2. 3歩うごかす
-3. 「こんにちは！」と言う
-4. y座標を 50 ずつ変える
-5. y座標を 0 にする
-6. for (4回くり返す)
-   - 10歩うごかす
-7. もし [条件] なら（条件: ゴールした？）`,
+    instructions: `緑の旗を押したら、右に進んで「こんにちは！」と言い、「ジャンプする」を1回使おう。その後くり返しで右へ進み、最後に「ゴールした？」でゴールを伝えよう。`,
+    examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          x: 43,
-          moveTotal: 43,
-          maxY: 50,
-          y: 0,
+          x: 4,
+          moveTotal: 4,
+          jumpCount: 1,
           messageIncludes: 'こんにちは！',
           lastMessage: 'ゴールできたよ！'
         }
@@ -360,33 +303,16 @@ export const challengesData: Challenge[] = [
     difficulty: '上級',
     image: 'images/reverse_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `二段ジャンプとループを組み合わせてゴールに届いたら、ジャンプ成功の報告だけを出そう。
-
-【ポイント】
-・「3歩うごかす」を2回入れてから動き出すと合計歩数を調整しやすい
-・「y座標を 50 ずつ変える」を2回続けると高さ100に到達する。必ず「y座標を 0 にする」で着地
-・for (回数を選んでくり返す) の中に「10歩うごかす」を入れて合計x座標を40以上にする（回数は4）
-・「もし [条件] なら」で「ゴールした？」を選び、その中に「ジャンプ成功！」と言うを入れて、条件が真のときだけ報告を出そう（自動メッセージは使わない）`,
-    examples: `例のブロック並び:
-1. ⚑ が押されたとき
-2. 3歩うごかす
-3. 3歩うごかす
-4. y座標を 50 ずつ変える
-5. y座標を 50 ずつ変える
-6. y座標を 0 にする
-7. for (4回くり返す)
-   - 10歩うごかす
-8. もし [条件] なら（条件: ゴールした？）
-   - 「ジャンプ成功！」と言う`,
+    instructions: `右へ進んでから二段ジャンプで高く上がり、着地したあと、くり返しで右に進んでゴールへ。最後は「ゴールした？」の中で「ジャンプ成功！」と言って、ゴール時だけ報告しよう。`,
+    examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          x: 46,
-          moveTotal: 46,
-          maxY: 100,
-          y: 0,
+          x: 5,
+          moveTotal: 5,
+          jumpCount: 2,
           messageIncludes: 'ジャンプ成功！',
           lastMessage: 'ジャンプ成功！'
         }
@@ -401,28 +327,15 @@ export const challengesData: Challenge[] = [
     difficulty: '中級',
     image: 'images/sum_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `forブロックを2つ連続で使って長距離を移動しよう。
-
-【ポイント】
-・1本目のfor (回数を選んでくり返す) に「10歩うごかす」を入れる（回数は4）
-・2本目も同じように配置して合計80歩進む
-・途中で y座標 を必ず 0 に戻しておくと安全
-・最後に「もし [条件] なら」で「ゴールした？」を選び、自動の「ゴールできたよ！」メッセージを出そう`,
-    examples: `例のブロック並び:
-1. ⚑ が押されたとき
-2. for (4回くり返す)
-   - 10歩うごかす
-3. for (4回くり返す)
-   - 10歩うごかす
-4. もし [条件] なら（条件: ゴールした？）`,
+    instructions: `2つのループを連続で使い、右へ長く進んでゴールを目指し、最後に「ゴールした？」でメッセージを出そう。`,
+    examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          x: 80,
-          moveTotal: 80,
-          y: 0,
+          x: 8,
+          moveTotal: 8,
           messageIncludes: 'ゴールできたよ！',
           lastMessage: 'ゴールできたよ！'
         }
@@ -437,30 +350,16 @@ export const challengesData: Challenge[] = [
     difficulty: '上級',
     image: 'images/character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `動きの順番を意識して、最後にジャンプとゴール確認を入れよう。
-
-【ポイント】
-・for (回数を選んでくり返す) の中で40歩進む（回数は4）
-・その後で「こんにちは！」と言う
-・ゴール間際に「y座標を 50 ずつ変える」でジャンプし、必ず「y座標を 0 にする」で着地
-・「もし [条件] なら」で「ゴールした？」を選び、自動メッセージで締める`,
-    examples: `例のブロック並び:
-1. ⚑ が押されたとき
-2. for (4回くり返す)
-   - 10歩うごかす
-3. 「こんにちは！」と言う
-4. y座標を 50 ずつ変える
-5. y座標を 0 にする
-6. もし [条件] なら（条件: ゴールした？）`,
+    instructions: `くり返しで右へ進んだあと、「こんにちは！」と言ってジャンプし、必ず着地してから「ゴールした？」で報告しよう。`,
+    examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          x: 40,
-          moveTotal: 40,
-          maxY: 50,
-          y: 0,
+          x: 4,
+          moveTotal: 4,
+          jumpCount: 1,
           messageIncludes: 'こんにちは！',
           lastMessage: 'ゴールできたよ！'
         }
@@ -475,31 +374,16 @@ export const challengesData: Challenge[] = [
     difficulty: '中級',
     image: 'images/reverse_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `細かい動きとジャンプを組み合わせて、最後にだけゴール報告をしよう。
-
-【ポイント】
-・「3歩うごかす」を3回入れてから for (回数を選んでくり返す) に「10歩うごかす」を入れる（回数は4）
-・「y座標を 50 ずつ変える」で一度ジャンプし、「y座標を 0 にする」で着地
-・「もし [条件] なら」で「ゴールした？」を選び、余計なセリフは追加せず自動メッセージでゴール報告`,
-    examples: `例のブロック並び:
-1. ⚑ が押されたとき
-2. 3歩うごかす
-3. 3歩うごかす
-4. 3歩うごかす
-5. for (4回くり返す)
-   - 10歩うごかす
-6. y座標を 50 ずつ変える
-7. y座標を 0 にする
-8. もし [条件] なら（条件: ゴールした？）`,
+    instructions: `細かい前進とくり返しの前進をつなげ、ジャンプで一度上がって戻ったあと、「ゴールした？」でゴール時だけメッセージが出るように仕上げよう。`,
+    examples: '',
     video: '',
     testCases: [
       {
         input: [{}],
         expected: {
-          x: 49,
-          moveTotal: 49,
-          maxY: 50,
-          y: 0,
+          x: 5,
+          moveTotal: 5,
+          jumpCount: 1,
           lastMessage: 'ゴールできたよ！'
         }
       }

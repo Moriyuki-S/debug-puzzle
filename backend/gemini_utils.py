@@ -175,7 +175,7 @@ def generate_workspace_logic(challenge: Dict[str, Any]) -> Dict[str, Any]:
 
         制約:
         - ブロックの種類 (type):
-          event_flag / motion_move / motion_move_small / motion_change_y / motion_set_y_zero /
+          event_flag / motion_move / motion_move_small / motion_jump /
           looks_hello / looks_goal / looks_jump / control_for_loop / control_if_goal / condition_goal_reached / control_end
         - control_for_loop には必要なら loopCount を数値で付けられます (省略可)。
         - control_if_goal には conditionId を "condition_goal_reached" で付けられます (省略可)。
