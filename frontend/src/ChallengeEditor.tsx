@@ -610,7 +610,6 @@ const ChallengeEditor = () => {
   const [replayIndex, setReplayIndex] = useState(0);
   const [isReplaying, setIsReplaying] = useState(false);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
-  const [latestResults, setLatestResults] = useState<TestResult[]>([]);
   const [selectedResultIndex, setSelectedResultIndex] = useState(0);
   const [runError, setRunError] = useState<string>('');
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
@@ -1164,7 +1163,6 @@ const ChallengeEditor = () => {
     const firstError = results.find((item) => item.status === 'error');
     setRunError(firstError?.message ?? '');
     setTestResults(results);
-    setLatestResults(results);
     setSelectedResultIndex(0);
     setIsResultModalOpen(true);
     setIsRunning(false);
@@ -1220,9 +1218,6 @@ const ChallengeEditor = () => {
     ? selectedState.messages[selectedState.messages.length - 1]
     : '';
   const goalX = CONTROL_GOAL_TARGET_X * 40;
-  const finalResultSummary = latestResults.length
-    ? `${latestResults.filter((r) => r.status === 'success').length} / ${latestResults.length} テスト成功`
-    : '未実行';
   const selectedStatus = selectedResult?.status ?? null;
   const statusTone =
     selectedStatus === 'success'
@@ -1353,36 +1348,9 @@ const ChallengeEditor = () => {
 
             <div className="flex flex-col gap-6">
               <div className="flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div className="bg-slate-800 px-4 py-3 flex items-center justify-between text-white">
-                  <div className="flex items-center gap-2">
-                    <Code2 className="w-5 h-5 text-indigo-200" />
-                    <span className="font-semibold">ワークスペース</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm">
-                    <span className="text-indigo-100">{finalResultSummary}</span>
-                    <button
-                      type="button"
-                      onClick={handleRun}
-                      disabled={isRunning}
-                      className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold shadow transition-transform ${
-                        isRunning
-                          ? 'bg-slate-400 cursor-wait'
-                          : 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300'
-                      }`}
-                    >
-                      {isRunning ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          実行中...
-                        </>
-                      ) : (
-                        <>
-                          <PlayCircle className="w-4 h-4" />
-                          テストを実行
-                        </>
-                      )}
-                    </button>
-                  </div>
+                <div className="bg-slate-800 px-4 py-3 flex items-center gap-2 text-white">
+                  <Code2 className="w-5 h-5 text-indigo-200" />
+                  <span className="font-semibold">ワークスペース</span>
                 </div>
                 <div className="flex-1 bg-slate-50 p-4">
                 <div className="flex flex-col gap-2 mb-3">
@@ -1400,6 +1368,30 @@ const ChallengeEditor = () => {
                       {aiGenerateError}
                     </div>
                   ) : null}
+                </div>
+                <div className="mb-4">
+                  <button
+                    type="button"
+                    onClick={handleRun}
+                    disabled={isRunning}
+                    className={`w-full inline-flex items-center justify-center gap-3 rounded-xl px-5 py-3 text-lg font-bold shadow transition-transform run-button-highlight ${
+                      isRunning
+                        ? 'bg-slate-400 cursor-wait'
+                        : 'bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 hover:from-rose-600 hover:via-red-600 hover:to-orange-600 focus:outline-none focus:ring-2 focus:ring-rose-300'
+                    }`}
+                  >
+                    {isRunning ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        実行中...
+                      </>
+                    ) : (
+                      <>
+                        <PlayCircle className="w-5 h-5" />
+                        テストを実行
+                      </>
+                    )}
+                  </button>
                 </div>
                 <div
                   ref={workspaceAreaRef}
@@ -1611,7 +1603,6 @@ const ChallengeEditor = () => {
             <Terminal className="w-5 h-5 text-indigo-500" />
             <h3 className="text-lg font-semibold text-slate-800">テスト結果</h3>
           </div>
-          <span className="text-sm text-slate-500">{finalResultSummary}</span>
         </div>
         {runError && (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-3">

@@ -567,3 +567,23 @@
   z-index: 10;
   box-shadow: 0 10px 20px rgba(248, 113, 113, 0.4);
 }
+
+.run-button-highlight {
+  animation: run-button-blink 1.4s ease-in-out infinite alternate;
+  box-shadow: 0 12px 28px rgba(244, 63, 94, 0.35), 0 6px 14px rgba(239, 68, 68, 0.3);
+}
+
+@keyframes run-button-blink {
+  0% {
+    filter: brightness(1);
+    transform: translateY(0);
+  }
+  50% {
+    filter: brightness(1.12);
+    transform: translateY(-1px);
+  }
+  100% {
+    filter: brightness(1.2);
+    transform: translateY(0);
+  }
+}
