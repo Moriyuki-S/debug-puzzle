@@ -63,7 +63,7 @@ type DragPreviewState = {
 };
 
 const CONTROL_GOAL_TARGET_X = 4;
-const CONTROL_GOAL_MESSAGE = 'ゴールできたよ！';
+const CONTROL_GOAL_MESSAGE = '着いたよ！';
 const DEFAULT_CONTROL_FOR_LOOP_COUNT = 4;
 const CONTROL_FOR_LOOP_PALETTE_LABEL = 'for (回数を選んでくり返す)';
 const MIN_CONTROL_FOR_LOOP_COUNT = 1;
@@ -83,7 +83,7 @@ const paletteItems: ScratchPaletteItem[] = [
   { id: 'looks_hello', label: '「こんにちは！」と言う', color: '#9966FF', group: '見た目' },
   { id: 'looks_goal', label: '「着いたよ！」と言う', color: '#9966FF', group: '見た目' },
   { id: 'looks_jump', label: '「ジャンプ成功！」と言う', color: '#9966FF', group: '見た目' },
-  { id: 'looks_arrived', label: '「ゴールできたよ！」と言う', color: '#9966FF', group: '見た目' },
+  { id: 'looks_arrived', label: '「着いたよ！」と言う', color: '#9966FF', group: '見た目' },
   { id: 'control_for_loop', label: CONTROL_FOR_LOOP_PALETTE_LABEL, color: '#FFAB19', group: 'コントロール' },
   { id: 'control_if_goal', label: 'もし [条件] なら', color: '#FFAB19', group: 'コントロール' },
   { id: 'condition_goal_reached', label: 'ゴールした？', color: '#FACC15', group: '条件' },
@@ -509,12 +509,10 @@ const executeNode = (node: ProgramNode): { error?: string } => {
         if (conditionResult.error) {
           return { error: conditionResult.error };
         }
+        if (node.children.length === 0) {
+          return { error: '「ゴールした？」の下に動かしたいブロックを入れてみよう！' };
+        }
         if (conditionResult.value) {
-          if (node.children.length === 0) {
-            state.messages.push(CONTROL_GOAL_MESSAGE);
-            pushTrace();
-            return {};
-          }
           return executeNodes(node.children);
         }
         return {};
@@ -594,7 +592,7 @@ const checkExpectation = (state: ScratchState, expected: unknown) => {
   return { success: true, message: 'バッチリ！ 期待通りの動きだよ。' };
 };
 
-const ChallengeEditor = () => {
+function ChallengeEditor() {
   const { themeId } = useParams();
   const navigate = useNavigate();
 
@@ -1703,4 +1701,5 @@ const ChallengeEditor = () => {
   );
 };
 
+export { ChallengeEditor };
 export default ChallengeEditor;

@@ -73,7 +73,7 @@ export const challengesData: Challenge[] = [
     difficulty: '初級',
     image: 'images/character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `緑の旗のあと、くり返しブロックで右へ4回進み、最後に「ゴールした？」で判定してゴールできたら自動で報告しよう。上方向には動かさない。`,
+    instructions: `緑の旗のあと、くり返しブロックで右へ4回進み、最後に「ゴールした？」で判定してゴールできたら「着いたよ！」と報告しよう。上方向には動かさない。`,
     examples: '',
     video: '',
     testCases: [
@@ -82,8 +82,8 @@ export const challengesData: Challenge[] = [
         expected: {
           x: 4,
           moveTotal: 4,
-          messageIncludes: 'ゴールできたよ！',
-          lastMessage: 'ゴールできたよ！'
+          messageIncludes: '着いたよ！',
+          lastMessage: '着いたよ！'
         }
       }
     ]
@@ -96,7 +96,7 @@ export const challengesData: Challenge[] = [
     difficulty: '中級',
     image: 'images/reverse_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `緑の旗のあと、右に6回進み、途中で「ジャンプする」を2回使ってから「ゴールした？」で判定してゴールできたらメッセージを出そう。`,
+    instructions: `緑の旗のあと、右に6回進み、途中で「ジャンプする」を2回使ってから「ゴールした？」で判定し、ゴールできたら「着いたよ！」とメッセージを出そう。`,
     examples: '',
     video: '',
     testCases: [
@@ -106,8 +106,8 @@ export const challengesData: Challenge[] = [
           x: 6,
           moveTotal: 6,
           jumpCount: 2,
-          messageIncludes: 'ゴールできたよ！',
-          lastMessage: 'ゴールできたよ！'
+          messageIncludes: '着いたよ！',
+          lastMessage: '着いたよ！'
         }
       }
     ]
@@ -120,7 +120,7 @@ export const challengesData: Challenge[] = [
     difficulty: '中級',
     image: 'images/sum_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `緑の旗のあと、右に進んで「こんにちは！」と言い、「ジャンプする」を1回使おう。その後はくり返しで右へ進み、最後に「ゴールした？」でゴールできたことを報告しよう。`,
+    instructions: `緑の旗のあと、右に進んで「こんにちは！」と言い、「ジャンプする」を1回使おう。その後はくり返しで右へ進み、最後に「ゴールした？」でゴールできたら「着いたよ！」と報告しよう。`,
     examples: '',
     video: '',
     testCases: [
@@ -131,7 +131,7 @@ export const challengesData: Challenge[] = [
           moveTotal: 4,
           jumpCount: 1,
           messageIncludes: 'こんにちは！',
-          lastMessage: 'ゴールできたよ！'
+          lastMessage: '着いたよ！'
         }
       }
     ]
@@ -144,7 +144,7 @@ export const challengesData: Challenge[] = [
     difficulty: '上級',
     image: 'images/reverse_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `緑の旗のあと、右に2回進んでから「ジャンプする」を2回使い、続けてくり返しで右へ進み、最後は「ゴールした？」でゴールを確認して報告しよう。`,
+    instructions: `緑の旗のあと、右に2回進んでから「ジャンプする」を2回使い、続けてくり返しで右へ進み、最後は「ゴールした？」で確認し、着いたら「着いたよ！」と報告しよう。`,
     examples: '',
     video: '',
     testCases: [
@@ -154,8 +154,8 @@ export const challengesData: Challenge[] = [
           x: 5,
           moveTotal: 5,
           jumpCount: 2,
-          messageIncludes: 'ゴールできたよ！',
-          lastMessage: 'ゴールできたよ！'
+          messageIncludes: '着いたよ！',
+          lastMessage: '着いたよ！'
         }
       }
     ]
@@ -190,7 +190,7 @@ export const challengesData: Challenge[] = [
     difficulty: '初級',
     image: 'images/sum_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `緑の旗のあと、くり返しで右へ進み、上方向には動かさず「ゴールした？」でゴールを伝えよう。`,
+    instructions: `緑の旗のあと、くり返しで右へ進み、上方向には動かさず「ゴールした？」でゴールできたら「着いたよ！」と伝えよう。`,
     examples: '',
     video: '',
     testCases: [
@@ -199,8 +199,8 @@ export const challengesData: Challenge[] = [
         expected: {
           x: 5,
           moveTotal: 5,
-          messageIncludes: 'ゴールできたよ！',
-          lastMessage: 'ゴールできたよ！'
+          messageIncludes: '着いたよ！',
+          lastMessage: '着いたよ！'
         }
       }
     ]
@@ -279,7 +279,7 @@ export const challengesData: Challenge[] = [
     difficulty: '中級',
     image: 'images/character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `緑の旗を押したら、右に進んで「こんにちは！」と言い、「ジャンプする」を1回使おう。その後くり返しで右へ進み、最後に「ゴールした？」でゴールを伝えよう。`,
+    instructions: `緑の旗を押したら、右に進んで「こんにちは！」と言い、「ジャンプする」を1回使おう。その後くり返しで右へ進み、最後に「ゴールした？」でゴールできたら「着いたよ！」と伝えよう。`,
     examples: '',
     video: '',
     testCases: [
@@ -290,7 +290,7 @@ export const challengesData: Challenge[] = [
           moveTotal: 4,
           jumpCount: 1,
           messageIncludes: 'こんにちは！',
-          lastMessage: 'ゴールできたよ！'
+          lastMessage: '着いたよ！'
         }
       }
     ]
@@ -327,7 +327,7 @@ export const challengesData: Challenge[] = [
     difficulty: '中級',
     image: 'images/sum_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `2つのループを連続で使い、右へ長く進んでゴールを目指し、最後に「ゴールした？」でメッセージを出そう。`,
+    instructions: `2つのループを連続で使い、右へ長く進んでゴールを目指し、最後に「ゴールした？」でゴールできたら「着いたよ！」とメッセージを出そう。`,
     examples: '',
     video: '',
     testCases: [
@@ -336,8 +336,8 @@ export const challengesData: Challenge[] = [
         expected: {
           x: 8,
           moveTotal: 8,
-          messageIncludes: 'ゴールできたよ！',
-          lastMessage: 'ゴールできたよ！'
+          messageIncludes: '着いたよ！',
+          lastMessage: '着いたよ！'
         }
       }
     ]
@@ -350,7 +350,7 @@ export const challengesData: Challenge[] = [
     difficulty: '上級',
     image: 'images/character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `くり返しで右へ進んだあと、「こんにちは！」と言ってジャンプし、必ず着地してから「ゴールした？」で報告しよう。`,
+    instructions: `くり返しで右へ進んだあと、「こんにちは！」と言ってジャンプし、必ず着地してから「ゴールした？」で着いたか判定し、「着いたよ！」と報告しよう。`,
     examples: '',
     video: '',
     testCases: [
@@ -361,7 +361,7 @@ export const challengesData: Challenge[] = [
           moveTotal: 4,
           jumpCount: 1,
           messageIncludes: 'こんにちは！',
-          lastMessage: 'ゴールできたよ！'
+          lastMessage: '着いたよ！'
         }
       }
     ]
@@ -374,7 +374,7 @@ export const challengesData: Challenge[] = [
     difficulty: '中級',
     image: 'images/reverse_character.png?auto=format&fit=crop&w=800&q=80',
     languages: ['Scratch'],
-    instructions: `細かい前進とくり返しの前進をつなげ、ジャンプで一度上がって戻ったあと、「ゴールした？」でゴール時だけメッセージが出るように仕上げよう。`,
+    instructions: `細かい前進とくり返しの前進をつなげ、ジャンプで一度上がって戻ったあと、「ゴールした？」でゴールできたら「着いたよ！」だけが出るように仕上げよう。`,
     examples: '',
     video: '',
     testCases: [
@@ -384,7 +384,7 @@ export const challengesData: Challenge[] = [
           x: 5,
           moveTotal: 5,
           jumpCount: 1,
-          lastMessage: 'ゴールできたよ！'
+          lastMessage: '着いたよ！'
         }
       }
     ]
