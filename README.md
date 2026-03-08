@@ -1,8 +1,11 @@
-# Debug Master
+# Debug Puzzle
 
 ## 概要
 
-京大生が開発した新感覚プログラミング学習アプリDebug Master。AI生成のわざと間違えたコードを修正することで、間違い探しのように楽しくプログラミングを学べます。従来の「1から書く」学習よりハードルが低く、初心者でも気軽に体験可能！
+京大生が開発した新感覚プログラミング学習アプリ(Debug Master)[https://github.com/matsuda-tkm/debug-master]のブロックバージョン。「右に10歩進む」などが書かれたブロックを組み合わせることでプログラムを実装する事ができ、コードのかけない方でも楽しめます。
+
+<img width="1050" height="837" alt="debug-puzzle-thumb" src="https://github.com/user-attachments/assets/9f64c54a-da7c-4432-bf39-68b9c5e6699b" />
+
 
 ## 実績
 
