@@ -104,7 +104,7 @@ def generate_code_logic(
     fn_test_code_against_all_cases: Callable[[str, List[Dict[str, Any]]], bool],
 ) -> Dict[str, str]:
     response = client.models.generate_content(
-        model="gemini-2.0-flash",  # Consider making model name a config variable
+        model="gemini-3.0-flash",  # Consider making model name a config variable
         contents=[prompt_str],
         config=types.GenerateContentConfig(
             temperature=0.5,  # Consider making temperature a config variable
@@ -203,7 +203,7 @@ def generate_workspace_logic(challenge: Dict[str, Any]) -> Dict[str, Any]:
     ).strip()
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=[prompt],
         config=types.GenerateContentConfig(
           temperature=0.7,
@@ -339,7 +339,7 @@ def generate_hint_logic(
     )
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",  # Consider making model name a config variable
+        model="gemini-2.5-flash",  # Consider making model name a config variable
         contents=[prompt],
         config=types.GenerateContentConfig(
             temperature=0.0,  # Consider making temperature a config variable
@@ -387,7 +387,7 @@ After (修正後のコード):
 {test_results_text}
 """
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=[prompt],
         config=types.GenerateContentConfig(
             temperature=0.2,
@@ -436,7 +436,7 @@ AI生成コード（学習者が修正の出発点としたコード）:
 {test_results_text}
 """
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=[prompt],
         config=types.GenerateContentConfig(
             temperature=0.15,
