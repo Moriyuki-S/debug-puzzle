@@ -2,7 +2,7 @@
 
 ## 概要
 
-京大生が開発した新感覚プログラミング学習アプリ(Debug Master)[https://github.com/matsuda-tkm/debug-master] のブロックバージョン。「右に10歩進む」などが書かれたブロックを組み合わせることでプログラムを実装する事ができ、コードのかけない方でも楽しめます。
+京大生が開発した新感覚プログラミング学習アプリ[Debug Master](https://github.com/matsuda-tkm/debug-master) のブロックバージョン。「右に10歩進む」などが書かれたブロックを組み合わせることでプログラムを実装する事ができ、コードのかけない方でも楽しめます。
 
 <img width="1050" height="837" alt="debug-puzzle-thumb" src="https://github.com/user-attachments/assets/9f64c54a-da7c-4432-bf39-68b9c5e6699b" />
 
