@@ -5,7 +5,7 @@
 # ---------------
 
 ARG PYTHON_VERSION=3.13
-ARG APP_DIR=bug-gym/backend
+ARG APP_DIR=app
 
 
 # -------------------
@@ -16,7 +16,8 @@ FROM python:${PYTHON_VERSION}-slim-bookworm
 
 WORKDIR /${APP_DIR}
 
-COPY requirements.txt ./${APP_DIR}
+COPY requirements.txt ./requirements.txt
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY . .
