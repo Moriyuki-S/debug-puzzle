@@ -16,7 +16,7 @@ from gemini_utils import (
 )
 from starlette.responses import JSONResponse, StreamingResponse
 
-app = FastAPI(title="Debug Master Backend", version="1.0.0")
+app = FastAPI(title="Debug Puzzle Backend", version="1.0.0")
 
 # CORS (allow all origins for dev simplicity; tighten in production)
 app.add_middleware(

@@ -12,7 +12,7 @@ function HintModal({ hint, onClose }: HintModalProps) {
             <div className="w-40 h-63 flex-shrink-0">
               <img 
                 src="/images/character.png" 
-                alt="Debug Master Character" 
+                alt="Debug Puzzle Character" 
                 className="w-full h-full object-contain"
               />
             </div>
