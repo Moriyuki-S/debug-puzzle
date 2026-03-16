@@ -46,7 +46,7 @@ def call_gemini_api(prompt: str, system_prompt: str) -> str:
     while retry_count < max_retries:
         try:
             response = client.models.generate_content(
-                model="gemini-3.0-flash",
+                model="gemini-3-flash-preview",
                 contents=[prompt],
                 config=types.GenerateContentConfig(
                     temperature=0.6,
