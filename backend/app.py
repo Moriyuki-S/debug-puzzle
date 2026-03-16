@@ -186,7 +186,17 @@ def generate_retire_explanation(payload: dict[str, Any] = Body(...)) -> JSONResp
 
 @app.post("/api/generate-workspace")
 def generate_workspace(payload: dict[str, Any] = Body(...)) -> JSONResponse:
-    challenge: dict[str, Any] = payload.get("challenge", {})
+    challenge = payload.get("challenge")
+    if challenge is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing required 'challenge' object in request body.",
+        )
+    if not isinstance(challenge, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="'challenge' must be a JSON object.",
+        )
     try:
         result = generate_workspace_logic(challenge)
         return JSONResponse(content=result)
