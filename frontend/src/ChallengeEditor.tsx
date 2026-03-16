@@ -6,6 +6,7 @@ import {
   PlayCircle,
   Terminal,
 } from 'lucide-react';
+import Modal from './components/ui/Modal';
 import { Challenge } from './types/challenge';
 import { challengeService } from './services/challengeService';
 import stageCharacterImg from '../images/character.png';
@@ -15,11 +16,11 @@ type ScratchBlockId =
   | 'event_flag'
   | 'motion_move'
   | 'motion_move_small'
-  | 'motion_set_y_zero'
-  | 'motion_change_y'
+  | 'motion_jump'
   | 'looks_hello'
   | 'looks_goal'
   | 'looks_jump'
+  | 'looks_arrived'
   | 'control_for_loop'
   | 'control_if_goal'
   | 'condition_goal_reached';
@@ -61,8 +62,8 @@ type DragPreviewState = {
   source: 'palette' | 'workspace';
 };
 
-const CONTROL_GOAL_TARGET_X = 40;
-const CONTROL_GOAL_MESSAGE = 'ゴールできたよ！';
+const CONTROL_GOAL_TARGET_X = 4;
+const CONTROL_GOAL_MESSAGE = '着いたよ！';
 const DEFAULT_CONTROL_FOR_LOOP_COUNT = 4;
 const CONTROL_FOR_LOOP_PALETTE_LABEL = 'for (回数を選んでくり返す)';
 const MIN_CONTROL_FOR_LOOP_COUNT = 1;
@@ -77,13 +78,12 @@ const normalizeLoopCount = (value?: number) => {
 
 const paletteItems: ScratchPaletteItem[] = [
   { id: 'event_flag', label: '⚑ が押されたとき', color: '#FFBF00', group: 'イベント' },
-  { id: 'motion_move', label: '10歩うごかす', color: '#4C97FF', group: 'モーション' },
-  { id: 'motion_move_small', label: '3歩うごかす', color: '#4C97FF', group: 'モーション' },
-  { id: 'motion_change_y', label: 'y座標を 50 ずつ変える', color: '#4C97FF', group: 'モーション' },
-  { id: 'motion_set_y_zero', label: 'y座標を 0 にする', color: '#4C97FF', group: 'モーション' },
+  { id: 'motion_move', label: '右に進む', color: '#4C97FF', group: 'モーション' },
+  { id: 'motion_jump', label: 'ジャンプする', color: '#4C97FF', group: 'モーション' },
   { id: 'looks_hello', label: '「こんにちは！」と言う', color: '#9966FF', group: '見た目' },
   { id: 'looks_goal', label: '「着いたよ！」と言う', color: '#9966FF', group: '見た目' },
   { id: 'looks_jump', label: '「ジャンプ成功！」と言う', color: '#9966FF', group: '見た目' },
+  { id: 'looks_arrived', label: '「着いたよ！」と言う', color: '#9966FF', group: '見た目' },
   { id: 'control_for_loop', label: CONTROL_FOR_LOOP_PALETTE_LABEL, color: '#FFAB19', group: 'コントロール' },
   { id: 'control_if_goal', label: 'もし [条件] なら', color: '#FFAB19', group: 'コントロール' },
   { id: 'condition_goal_reached', label: 'ゴールした？', color: '#FACC15', group: '条件' },
@@ -93,6 +93,21 @@ const conditionPaletteItems = paletteItems.filter((item) => item.group === '条�
 const conditionBlockIdSet = new Set<ScratchBlockId>(conditionPaletteItems.map((item) => item.id));
 
 const groupOrder: Array<ScratchPaletteItem['group']> = ['イベント', 'モーション', '見た目', 'コントロール', '条件'];
+
+const defaultPaletteIds: ScratchBlockId[] = [
+  'event_flag',
+  'motion_move',
+  'motion_jump',
+  'looks_hello',
+  'looks_goal',
+  'looks_jump',
+  'control_for_loop',
+  'control_if_goal',
+];
+
+const challengePaletteWhitelist: Record<string, ScratchBlockId[]> = {
+  'scratch-boss-run': [...defaultPaletteIds],
+};
 
 type ProgramNode = {
   type: ScratchBlockId;
@@ -221,11 +236,130 @@ const newBlockId = (() => {
   };
 })();
 
+const allowedWorkspaceTypes = new Set<WorkspaceBlockType>([
+  'event_flag',
+  'motion_move',
+  'motion_jump',
+  'looks_hello',
+  'looks_goal',
+  'looks_jump',
+  'looks_arrived',
+  'control_for_loop',
+  'control_if_goal',
+  'condition_goal_reached',
+  'control_end',
+]);
+
+const hydrateGeneratedBlocks = (rawBlocks: unknown[]): WorkspaceBlock[] => {
+  if (!Array.isArray(rawBlocks)) return [];
+
+  const result: WorkspaceBlock[] = [];
+  let openControls = 0;
+
+  rawBlocks.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') {
+      return;
+    }
+    const blockType = (entry as Record<string, unknown>).type;
+    if (typeof blockType !== 'string') {
+      return;
+    }
+    if (!allowedWorkspaceTypes.has(blockType as WorkspaceBlockType)) {
+      return;
+    }
+
+    if (blockType === 'control_end') {
+      if (openControls > 0) {
+        openControls -= 1;
+        result.push({ id: newBlockId(), type: 'control_end' });
+      }
+      return;
+    }
+
+    const base: WorkspaceBlock = { id: newBlockId(), type: blockType as WorkspaceBlockType };
+    if (blockType === 'control_for_loop' && typeof (entry as Record<string, unknown>).loopCount === 'number') {
+      base.loopCount = (entry as Record<string, number>).loopCount;
+    }
+    if (blockType === 'control_if_goal') {
+      const candidate = (entry as Record<string, unknown>).conditionId;
+      if (typeof candidate === 'string' && conditionBlockIdSet.has(candidate as ScratchBlockId)) {
+        base.conditionId = candidate as ScratchBlockId;
+      }
+    }
+
+    result.push(base);
+    if (isControlStartBlock(base.type)) {
+      openControls += 1;
+    }
+  });
+
+  while (openControls > 0) {
+    result.push({ id: newBlockId(), type: 'control_end' });
+    openControls -= 1;
+  }
+
+  return result;
+};
+
+const ensureEventFlag = (blocks: WorkspaceBlock[]): WorkspaceBlock[] => {
+  if (blocks.length === 0) {
+    return [{ id: newBlockId(), type: 'event_flag' }];
+  }
+  if (blocks[0].type !== 'event_flag') {
+    return [{ id: newBlockId(), type: 'event_flag' }, ...blocks];
+  }
+  return blocks;
+};
+
+const generateBuggyWorkspace = (challengeId?: string): WorkspaceBlock[] => {
+  const createBlock = (type: WorkspaceBlockType, extras?: Partial<WorkspaceBlock>): WorkspaceBlock => ({
+    id: newBlockId(),
+    type,
+    ...extras,
+  });
+
+  switch (challengeId) {
+    case 'scratch-greeting':
+      // Missing the greeting block on purpose.
+      return [createBlock('event_flag')];
+    case 'scratch-walk':
+      // Not enough steps to reach 30; still says arrived.
+      return [
+        createBlock('event_flag'),
+        createBlock('motion_move'),
+        createBlock('motion_move'),
+        createBlock('looks_goal'),
+      ];
+    case 'scratch-jump':
+      // Jumps but forgets to greet.
+      return [createBlock('event_flag'), createBlock('motion_jump'), createBlock('looks_jump')];
+    case 'scratch-control-loop': {
+      // Loops only 3 times and leaves the if-condition empty to surface an error.
+      const loopStart = createBlock('control_for_loop', { loopCount: 3 });
+      const loopEnd = createBlock('control_end');
+      const ifStart = createBlock('control_if_goal');
+      const ifEnd = createBlock('control_end');
+      return [
+        createBlock('event_flag'),
+        loopStart,
+        createBlock('motion_move'),
+        loopEnd,
+        ifStart,
+        createBlock('looks_goal'),
+        ifEnd,
+      ];
+    }
+    default:
+      return [createBlock('event_flag')];
+  }
+};
+
 type TestResult = {
   status: 'success' | 'failure' | 'error';
   message: string;
   testCase: number | string;
   state?: ScratchState;
+  trace?: ScratchState[];
 };
 
 type ScratchState = {
@@ -234,6 +368,7 @@ type ScratchState = {
   moveTotal: number;
   maxY: number;
   minY: number;
+  jumpCount: number;
   messages: string[];
 };
 
@@ -244,6 +379,7 @@ const createInitialState = (overrides?: Partial<ScratchState>): ScratchState => 
     moveTotal: overrides?.moveTotal ?? 0,
     maxY: overrides?.maxY ?? 0,
     minY: overrides?.minY ?? 0,
+    jumpCount: overrides?.jumpCount ?? 0,
     messages: overrides?.messages ? [...overrides.messages] : [],
   };
 
@@ -257,6 +393,16 @@ const createInitialState = (overrides?: Partial<ScratchState>): ScratchState => 
   return base;
 };
 
+const cloneState = (state: ScratchState): ScratchState => ({
+  x: state.x,
+  y: state.y,
+  moveTotal: state.moveTotal,
+  maxY: state.maxY,
+  minY: state.minY,
+  jumpCount: state.jumpCount,
+  messages: [...state.messages],
+});
+
 const updateVerticalExtremes = (state: ScratchState) => {
   if (state.y > state.maxY) {
     state.maxY = state.y;
@@ -268,8 +414,9 @@ const updateVerticalExtremes = (state: ScratchState) => {
 
 const runWorkspaceProgram = (
   blocks: WorkspaceBlock[],
-  overrides?: Partial<ScratchState>
-): { state?: ScratchState; error?: string } => {
+  overrides?: Partial<ScratchState>,
+  recordTrace = false
+): { state?: ScratchState; error?: string; trace?: ScratchState[] } => {
   if (!blocks.length) {
     return { error: 'まずはブロックを配置してみよう！' };
   }
@@ -285,6 +432,13 @@ const runWorkspaceProgram = (
 
   const state = createInitialState(overrides);
   let eventSeen = false;
+  const trace: ScratchState[] = recordTrace ? [cloneState(state)] : [];
+
+  const pushTrace = () => {
+    if (recordTrace) {
+      trace.push(cloneState(state));
+    }
+  };
 
   const evaluateCondition = (conditionId?: ScratchBlockId): { error?: string; value?: boolean } => {
     if (!conditionId) {
@@ -298,38 +452,44 @@ const runWorkspaceProgram = (
     }
   };
 
-  const executeNode = (node: ProgramNode): { error?: string } => {
-    switch (node.type) {
+const executeNode = (node: ProgramNode): { error?: string } => {
+  switch (node.type) {
       case 'event_flag':
         if (eventSeen) {
           return { error: 'イベントブロックは一番上の1つだけにしよう！' };
         }
         eventSeen = true;
+        pushTrace();
         return {};
       case 'motion_move':
-        state.x += 10;
-        state.moveTotal += 10;
+        state.x += 1;
+        state.moveTotal += 1;
+        pushTrace();
         return {};
-      case 'motion_move_small':
-        state.x += 3;
-        state.moveTotal += 3;
-        return {};
-      case 'motion_change_y':
+      case 'motion_jump':
+        state.jumpCount += 1;
         state.y += 50;
         updateVerticalExtremes(state);
-        return {};
-      case 'motion_set_y_zero':
+        pushTrace();
         state.y = 0;
         updateVerticalExtremes(state);
+        pushTrace();
         return {};
       case 'looks_hello':
         state.messages.push('こんにちは！');
+        pushTrace();
         return {};
       case 'looks_goal':
         state.messages.push('着いたよ！');
+        pushTrace();
         return {};
       case 'looks_jump':
         state.messages.push('ジャンプ成功！');
+        pushTrace();
+        return {};
+      case 'looks_arrived':
+        state.messages.push(CONTROL_GOAL_MESSAGE);
+        pushTrace();
         return {};
       case 'control_for_loop': {
         if (node.children.length === 0) {
@@ -349,11 +509,10 @@ const runWorkspaceProgram = (
         if (conditionResult.error) {
           return { error: conditionResult.error };
         }
+        if (node.children.length === 0) {
+          return { error: '「ゴールした？」の下に動かしたいブロックを入れてみよう！' };
+        }
         if (conditionResult.value) {
-          if (node.children.length === 0) {
-            state.messages.push(CONTROL_GOAL_MESSAGE);
-            return {};
-          }
           return executeNodes(node.children);
         }
         return {};
@@ -384,7 +543,7 @@ const runWorkspaceProgram = (
     return { error: '一番上には「⚑ が押されたとき」を置いてみよう！' };
   }
 
-  return { state };
+  return { state, trace: recordTrace ? trace : undefined };
 };
 
 const checkExpectation = (state: ScratchState, expected: unknown) => {
@@ -396,19 +555,22 @@ const checkExpectation = (state: ScratchState, expected: unknown) => {
   const obj = expected as Record<string, unknown>;
 
   if (typeof obj.x === 'number' && state.x !== obj.x) {
-    issues.push(`x座標を ${obj.x} にそろえよう（いまは ${state.x}）。`);
+    issues.push(`右への回数を ${obj.x} 回にそろえよう（いまは ${state.x} 回）。`);
   }
   if (typeof obj.y === 'number' && state.y !== obj.y) {
-    issues.push(`y座標を ${obj.y} に戻そう（いまは ${state.y}）。`);
+    issues.push(`上を ${obj.y} に戻そう（いまは ${state.y}）。`);
+  }
+  if (typeof obj.jumpCount === 'number' && state.jumpCount !== obj.jumpCount) {
+    issues.push(`ジャンプする回数を ${obj.jumpCount} 回に合わせよう（いまは ${state.jumpCount} 回）。`);
   }
   if (typeof obj.moveTotal === 'number' && state.moveTotal !== obj.moveTotal) {
-    issues.push(`合計 ${obj.moveTotal} 歩動かそう（いまは ${state.moveTotal} 歩）。`);
+    issues.push(`合計 ${obj.moveTotal} 回「右に進む」を使おう（いまは ${state.moveTotal} 回）。`);
   }
   if (typeof obj.maxY === 'number' && state.maxY < obj.maxY) {
     issues.push(`もっと高くジャンプしてみよう！（最高 y は ${state.maxY} → 目標 ${obj.maxY}）`);
   }
   if (typeof obj.minY === 'number' && state.minY > obj.minY) {
-    issues.push(`y座標を ${obj.minY} 以下まで下げてみよう（最小値は ${state.minY}）。`);
+    issues.push(`上を ${obj.minY} 以下まで下げてみよう（最小値は ${state.minY}）。`);
   }
   if (typeof obj.messageIncludes === 'string') {
     const target = obj.messageIncludes;
@@ -430,7 +592,7 @@ const checkExpectation = (state: ScratchState, expected: unknown) => {
   return { success: true, message: 'バッチリ！ 期待通りの動きだよ。' };
 };
 
-const ChallengeEditor = () => {
+function ChallengeEditor() {
   const { themeId } = useParams();
   const navigate = useNavigate();
 
@@ -441,9 +603,14 @@ const ChallengeEditor = () => {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [isDraggingBlock, setIsDraggingBlock] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiGenerateError, setAiGenerateError] = useState('');
+  const [replayIndex, setReplayIndex] = useState(0);
+  const [isReplaying, setIsReplaying] = useState(false);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [selectedResultIndex, setSelectedResultIndex] = useState(0);
   const [runError, setRunError] = useState<string>('');
+  const [isResultModalOpen, setIsResultModalOpen] = useState(false);
   const [isPaletteHovered, setIsPaletteHovered] = useState(false);
   const [dragPreview, setDragPreview] = useState<DragPreviewState | null>(null);
   const workspaceSlotRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -480,21 +647,54 @@ const ChallengeEditor = () => {
   }, [themeId]);
 
   useEffect(() => {
+    let isCancelled = false;
+    const seedWorkspace = async () => {
+      if (!challenge) return;
+      setAiGenerating(true);
+      setAiGenerateError('');
+      try {
+        const generated = await challengeService.generateWorkspace(challenge);
+        const hydrated = ensureEventFlag(hydrateGeneratedBlocks(generated?.blocks ?? []));
+        if (!isCancelled && hydrated.length > 0) {
+          setWorkspace(hydrated);
+          setAiGenerating(false);
+          return;
+        }
+      } catch (error) {
+        console.warn('Failed to generate AI workspace, falling back to local template.', error);
+        if (!isCancelled) {
+          setAiGenerateError('AI生成に失敗したのでテンプレートで初期化しました。');
+        }
+      }
+      if (!isCancelled) {
+        setWorkspace(generateBuggyWorkspace(challenge.id));
+        setAiGenerating(false);
+      }
+    };
+    seedWorkspace();
+    return () => {
+      isCancelled = true;
+    };
+  }, [challenge]);
+
+  useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   const groupedPalette = useMemo(() => {
+    const allowedIds = new Set(challengePaletteWhitelist[challenge?.id ?? 'default'] ?? defaultPaletteIds);
+    const paletteForChallenge = paletteItems.filter((item) => allowedIds.has(item.id));
     return groupOrder
       .map((group) => ({
         group,
-        items: paletteItems.filter(
+        items: paletteForChallenge.filter(
           (item) =>
             item.group === group &&
             group !== '条件'
         ),
       }))
       .filter((section) => section.items.length > 0);
-  }, []);
+  }, [challenge]);
 
   const { blockIndentMap, slotIndentLevels } = useMemo(() => computeIndentationGuides(workspace), [workspace]);
 
@@ -555,11 +755,11 @@ const ChallengeEditor = () => {
       const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
       const offsetX = event.clientX - rect.left;
       const offsetY = event.clientY - rect.top;
-      const paletteInfo = resolvePaletteInfo(block.type);
-      const previewLabel =
-        block.type === 'control_for_loop'
-          ? formatLoopLabel(normalizeLoopCount(block.loopCount))
-          : paletteInfo.label;
+    const paletteInfo = resolvePaletteInfo(block.type);
+    const previewLabel =
+      block.type === 'control_for_loop'
+        ? formatLoopLabel(normalizeLoopCount(block.loopCount))
+        : paletteInfo.label;
       dragSourceRef.current = {
         type: 'workspace',
         blockId: block.id,
@@ -923,12 +1123,12 @@ const ChallengeEditor = () => {
     const results: TestResult[] = [];
 
     if (testCases.length === 0) {
-      const single = runWorkspaceProgram(workspace);
+      const single = runWorkspaceProgram(workspace, undefined, true);
       if (single.error) {
         results.push({ status: 'error', message: single.error, testCase: '-' });
         setRunError(single.error);
       } else if (single.state) {
-        results.push({ status: 'success', message: '自由に動かせたね！', testCase: '-', state: single.state });
+        results.push({ status: 'success', message: '自由に動かせたね！', testCase: '-', state: single.state, trace: single.trace });
       }
     } else {
       testCases.forEach((testCase, index) => {
@@ -936,7 +1136,7 @@ const ChallengeEditor = () => {
           Array.isArray(testCase.input) && testCase.input.length > 0
             ? (testCase.input[0] as Partial<ScratchState>)
             : undefined;
-        const outcome = runWorkspaceProgram(workspace, overrides);
+        const outcome = runWorkspaceProgram(workspace, overrides, true);
         if (outcome.error) {
           results.push({
             status: 'error',
@@ -952,6 +1152,7 @@ const ChallengeEditor = () => {
             message: expectation.message,
             testCase: index + 1,
             state: outcome.state,
+            trace: outcome.trace,
           });
         }
       });
@@ -961,6 +1162,7 @@ const ChallengeEditor = () => {
     setRunError(firstError?.message ?? '');
     setTestResults(results);
     setSelectedResultIndex(0);
+    setIsResultModalOpen(true);
     setIsRunning(false);
   }, [challenge, workspace]);
 
@@ -1004,12 +1206,48 @@ const ChallengeEditor = () => {
     ? Math.min(selectedResultIndex, testResults.length - 1)
     : 0;
   const selectedResult = testResults[resolvedSelectedIndex] ?? null;
-  const selectedState = selectedResult?.state;
-  const stageCatX = selectedState ? Math.max(-120, Math.min(120, selectedState.x * 4)) : 0;
-  const stageCatY = selectedState ? Math.max(-60, Math.min(60, -selectedState.y * 1.5)) : 0;
+  const activeTrace = selectedResult?.trace ?? [];
+  const hasTrace = activeTrace.length > 0;
+  const animatedState = hasTrace ? activeTrace[Math.min(replayIndex, activeTrace.length - 1)] : null;
+  const selectedState = animatedState ?? selectedResult?.state;
+  const stageCatX = selectedState ? Math.max(-200, Math.min(400, selectedState.x * 40)) : 0;
+  const stageCatY = selectedState ? Math.max(-200, Math.min(200, -selectedState.jumpCount * 20)) : 0;
   const stageSpeech = selectedState && selectedState.messages.length > 0
     ? selectedState.messages[selectedState.messages.length - 1]
     : '';
+  const goalX = CONTROL_GOAL_TARGET_X * 40;
+  const selectedStatus = selectedResult?.status ?? null;
+  const statusTone =
+    selectedStatus === 'success'
+      ? { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-800', label: '成功' }
+      : selectedStatus === 'failure'
+        ? { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', label: '要チェック' }
+        : selectedStatus === 'error'
+          ? { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', label: 'エラー' }
+          : null;
+
+  useEffect(() => {
+    if (!hasTrace) {
+      setReplayIndex(0);
+      setIsReplaying(false);
+      return;
+    }
+    setReplayIndex(0);
+    setIsReplaying(true);
+    let current = 0;
+    const timer = window.setInterval(() => {
+      current += 1;
+      if (current >= activeTrace.length) {
+        window.clearInterval(timer);
+        setIsReplaying(false);
+        return;
+      }
+      setReplayIndex(current);
+    }, 400);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [hasTrace, activeTrace]);
 
   if (isLoading || !challenge) {
     return (
@@ -1113,18 +1351,70 @@ const ChallengeEditor = () => {
                   <span className="font-semibold">ワークスペース</span>
                 </div>
                 <div className="flex-1 bg-slate-50 p-4">
+                <div className="flex flex-col gap-2 mb-3">
+                  {aiGenerating ? (
+                    <div className="flex items-center gap-3 text-sm text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                      <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" aria-hidden />
+                      <span className="font-semibold">AIがブロックを生成中...</span>
+                      <div className="flex-1 h-1 bg-indigo-100 rounded-full overflow-hidden">
+                        <div className="h-full w-2/3 bg-indigo-400 animate-pulse" />
+                      </div>
+                    </div>
+                  ) : null}
+                  {aiGenerateError ? (
+                    <div className="text-xs text-orange-700 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
+                      {aiGenerateError}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="mb-4">
+                  <button
+                    type="button"
+                    onClick={handleRun}
+                    disabled={isRunning}
+                    className={`w-full inline-flex items-center justify-center gap-3 rounded-xl px-5 py-3 text-lg font-bold shadow transition-transform run-button-highlight ${
+                      isRunning
+                        ? 'bg-slate-400 cursor-wait'
+                        : 'bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 hover:from-rose-600 hover:via-red-600 hover:to-orange-600 focus:outline-none focus:ring-2 focus:ring-rose-300'
+                    }`}
+                  >
+                    {isRunning ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        実行中...
+                      </>
+                    ) : (
+                      <>
+                        <PlayCircle className="w-5 h-5" />
+                        テストを実行
+                      </>
+                    )}
+                  </button>
+                </div>
                 <div
                   ref={workspaceAreaRef}
                   className={workspaceAreaClass}
                 >
                     {workspace.length === 0 ? (
-                      <div
-                        className={`workspace-drop-empty ${isDraggingBlock ? 'workspace-drop-empty--active' : ''}`}
-                      >
-                        <PlayCircle className="w-6 h-6" />
-                        <p className="font-semibold">ここにブロックをドロップ！</p>
-                        <p className="text-xs opacity-80">左のパレットからドラッグしてみよう</p>
-                      </div>
+                      aiGenerating ? (
+                        <div className="space-y-3">
+                          {[1, 2, 3].map((key) => (
+                            <div
+                              key={key}
+                              className="h-12 w-full rounded-lg bg-white/80 border border-slate-200 shadow-sm animate-pulse"
+                              style={{ minWidth: '320px' }}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div
+                          className={`workspace-drop-empty ${isDraggingBlock ? 'workspace-drop-empty--active' : ''}`}
+                        >
+                          <PlayCircle className="w-6 h-6" />
+                          <p className="font-semibold">ここにブロックをドロップ！</p>
+                          <p className="text-xs opacity-80">左のパレットからドラッグしてみよう</p>
+                        </div>
+                      )
                     ) : (
                       <>
                         {renderDropGuide(0)}
@@ -1270,121 +1560,6 @@ const ChallengeEditor = () => {
                 </div>
               </div>
 
-              <div className="flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div className="bg-slate-800 px-4 py-3 flex items-center justify-between text-white">
-                  <div className="flex items-center gap-2">
-                    <Terminal className="w-5 h-5 text-indigo-200" />
-                    <span className="font-semibold">テスト結果</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleRun}
-                    disabled={isRunning}
-                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold shadow transition-transform ${
-                      isRunning
-                        ? 'bg-slate-400 cursor-wait'
-                        : 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300'
-                    }`}
-                  >
-                    {isRunning ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        実行中...
-                      </>
-                    ) : (
-                      <>
-                        <PlayCircle className="w-4 h-4" />
-                        ブロックをテスト
-                      </>
-                    )}
-                  </button>
-                </div>
-                <div className="flex-1 bg-slate-50 p-4 space-y-4">
-                  <div className="flex items-center justify-between text-sm text-slate-500">
-                    <span>テスト結果</span>
-                    <span>
-                      {testResults.length > 0
-                        ? `${testResults.filter((item) => item.status === 'success').length} / ${testResults.length} テスト成功`
-                        : '未実行'}
-                    </span>
-                  </div>
-
-                  {runError && (
-                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                      {runError}
-                    </div>
-                  )}
-
-                  {selectedResult?.state && (
-                    <div className="stage-preview">
-                      <div className="stage-preview__scene">
-                        <div className="stage-preview__sky" aria-hidden />
-                        <div className="stage-preview__ground" aria-hidden />
-                        <div
-                          className="stage-preview__cat"
-                          style={{ '--cat-x': `${stageCatX}px`, '--cat-y': `${stageCatY}px` } as CSSProperties}
-                        >
-                          <img src={stageCharacterImg} alt="ステージキャラクター" />
-                          {stageSpeech && (
-                            <div className="stage-preview__speech">
-                              <span>{stageSpeech}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <dl className="stage-preview__stats">
-                        <div><dt>X</dt><dd>{selectedState?.x ?? 0}</dd></div>
-                        <div><dt>Y</dt><dd>{selectedState?.y ?? 0}</dd></div>
-                        <div><dt>合計歩数</dt><dd>{selectedState?.moveTotal ?? 0}</dd></div>
-                      </dl>
-                    </div>
-                  )}
-
-                  {testResults.length === 0 && !runError && (
-                    <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
-                      実行ボタンを押してブロックの動きをチェックしよう！
-                    </div>
-                  )}
-
-                  {testResults.length > 0 && (
-                    <ul className="space-y-3">
-                      {testResults.map((result, index) => (
-                        <li
-                          key={`${result.testCase}-${index}`}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => setSelectedResultIndex(index)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault();
-                              setSelectedResultIndex(index);
-                            }
-                          }}
-                          className={`result-card ${
-                            result.status === 'success'
-                              ? 'result-card--success'
-                              : result.status === 'failure'
-                                ? 'result-card--warn'
-                                : 'result-card--error'
-                          } ${index === resolvedSelectedIndex ? 'result-card--active' : ''}`}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-semibold">テスト {result.testCase}</span>
-                            <span className="text-xs font-semibold uppercase tracking-wide">
-                              {result.status === 'success'
-                                ? 'Success'
-                                : result.status === 'failure'
-                                  ? 'Check'
-                                  : 'Error'}
-                            </span>
-                          </div>
-                          <p className="leading-relaxed whitespace-pre-wrap">{result.message}</p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
             </div>
           </section>
 
@@ -1420,8 +1595,111 @@ const ChallengeEditor = () => {
           )}
         </div>
       )}
+      <Modal isOpen={isResultModalOpen} onClose={() => setIsResultModalOpen(false)} className="max-w-3xl">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Terminal className="w-5 h-5 text-indigo-500" />
+            <h3 className="text-lg font-semibold text-slate-800">テスト結果</h3>
+          </div>
+        </div>
+        {runError && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 mb-3">
+            {runError}
+          </div>
+        )}
+        {selectedResult && statusTone && (
+          <div className={`rounded-xl border px-4 py-3 text-sm mb-3 ${statusTone.bg} ${statusTone.border} ${statusTone.text}`}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold uppercase tracking-wide">テスト {selectedResult.testCase}</span>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-white/70">{statusTone.label}</span>
+            </div>
+            <p className="leading-relaxed whitespace-pre-wrap">{selectedResult.message}</p>
+          </div>
+        )}
+        {selectedResult?.state && (
+          <div className="stage-preview mb-3">
+            <div className="stage-preview__scene">
+              <div className="stage-preview__sky" aria-hidden />
+              <div className="stage-preview__grid" aria-hidden />
+              <div className="stage-preview__ground" aria-hidden />
+              <div
+                className="stage-preview__goal"
+                style={{ '--goal-x': `${goalX}px` } as CSSProperties}
+              >
+                <span className="stage-preview__goal-label">GOAL</span>
+              </div>
+              {isReplaying && (
+                <div className="absolute top-2 right-2 text-[11px] font-semibold text-indigo-900 bg-white/80 px-2 py-1 rounded-full shadow">
+                  再生中...
+                </div>
+              )}
+              <div
+                className="stage-preview__cat"
+                style={{ '--cat-x': `${stageCatX}px`, '--cat-y': `${stageCatY}px` } as CSSProperties}
+              >
+                <img src={stageCharacterImg} alt="ステージキャラクター" />
+                {stageSpeech && (
+                  <div className="stage-preview__speech">
+                    <span>{stageSpeech}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <dl className="stage-preview__stats">
+              <div><dt>右に進んだ回数</dt><dd>{selectedState?.x ?? 0}</dd></div>
+              <div><dt>ジャンプした回数</dt><dd>{selectedState?.jumpCount ?? 0}</dd></div>
+            </dl>
+            <p className="mt-2 text-[11px] text-slate-600">
+              右はブロックで進んだ回数、ジャンプは「ジャンプする」を使った回数だよ。回数をそろえてゴールを目指そう。
+            </p>
+          </div>
+        )}
+        {testResults.length > 0 && (
+          <ul className="space-y-3 max-h-60 overflow-y-auto">
+            {testResults.map((result, index) => (
+              <li
+                key={`${result.testCase}-${index}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedResultIndex(index)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedResultIndex(index);
+                  }
+                }}
+                className={`result-card ${
+                  result.status === 'success'
+                    ? 'result-card--success'
+                    : result.status === 'failure'
+                      ? 'result-card--warn'
+                      : 'result-card--error'
+                } ${index === resolvedSelectedIndex ? 'result-card--active' : ''}`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-semibold">テスト {result.testCase}</span>
+                  <span className="text-xs font-semibold uppercase tracking-wide">
+                    {result.status === 'success'
+                      ? 'Success'
+                      : result.status === 'failure'
+                        ? 'Check'
+                        : 'Error'}
+                  </span>
+                </div>
+                <p className="leading-relaxed whitespace-pre-wrap">{result.message}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+        {testResults.length === 0 && !runError && (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
+            実行ボタンを押してブロックの動きをチェックしよう！
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };
 
+export { ChallengeEditor };
 export default ChallengeEditor;

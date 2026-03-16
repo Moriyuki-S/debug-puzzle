@@ -12,10 +12,11 @@ from gemini_utils import (
     generate_hint_logic,
     generate_explanation_logic,
     generate_retire_explanation_logic,
+    generate_workspace_logic,
 )
 from starlette.responses import JSONResponse, StreamingResponse
 
-app = FastAPI(title="Debug Master Backend", version="1.0.0")
+app = FastAPI(title="Debug Puzzle Backend", version="1.0.0")
 
 # CORS (allow all origins for dev simplicity; tighten in production)
 app.add_middleware(
@@ -181,6 +182,26 @@ def generate_retire_explanation(payload: dict[str, Any] = Body(...)) -> JSONResp
         return JSONResponse(content=explanation)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@app.post("/api/generate-workspace")
+def generate_workspace(payload: dict[str, Any] = Body(...)) -> JSONResponse:
+    challenge = payload.get("challenge")
+    if challenge is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing required 'challenge' object in request body.",
+        )
+    if not isinstance(challenge, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="'challenge' must be a JSON object.",
+        )
+    try:
+        result = generate_workspace_logic(challenge)
+        return JSONResponse(content=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate workspace: {str(e)}")
 
 
 if __name__ == "__main__":

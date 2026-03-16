@@ -1,7 +1,7 @@
 import { Challenge } from '../types/challenge';
 import { challengesData } from '../challengesData';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8080';
 
 class ChallengeService {
   async getAllChallenges(): Promise<Challenge[]> {
@@ -89,6 +89,20 @@ class ChallengeService {
       console.error(`Error deleting challenge ${id}:`, error);
       throw error;
     }
+  }
+
+  async generateWorkspace(challenge: Challenge): Promise<{ blocks: any[] }> {
+    const response = await fetch(`${API_BASE_URL}/api/generate-workspace`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challenge }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to generate workspace: ${response.statusText}`);
+    }
+
+    return response.json();
   }
 }
 
